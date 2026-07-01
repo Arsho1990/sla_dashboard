@@ -1,0 +1,2045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLA Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* CSS Variables for Theming */
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f5f5f5;
+      --bg-tertiary: #efefef;
+      --text-primary: #1a1a1a;
+      --text-secondary: #666666;
+      --border-color: #e0e0e0;
+      --header-bg: #1a1a1a;
+      --header-text: #ffffff;
+      --accent-color: #4B0082;
+      --accent-light: #EDE7F6;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      --table-header-bg: #4B0082;
+      --table-header-text: #ffffff;
+      --table-row-alternate: #f9f9f9;
+      --success-color: #4CAF50;
+      --warning-color: #FF9800;
+      --danger-color: #D32F2F;
+      --info-color: #2196F3;
+    }
+
+    /* Dark Mode */
+    html.dark-mode {
+      --bg-primary: #1e1e1e;
+      --bg-secondary: #2d2d2d;
+      --bg-tertiary: #3a3a3a;
+      --text-primary: #e0e0e0;
+      --text-secondary: #a0a0a0;
+      --border-color: #444444;
+      --header-bg: #0d0d0d;
+      --header-text: #ffffff;
+      --accent-light: #3d2d5c;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --table-row-alternate: #252525;
+    }
+
+    /* Global Styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      transition: all 0.3s ease;
+      line-height: 1.6;
+    }
+
+    /* Header Styles */
+    .header {
+      background-color: var(--header-bg);
+      color: var(--header-text);
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .logo {
+      height: 40px;
+      max-width: 150px;
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #BB86FC;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      font-size: 13px;
+      color: #b0b0b0;
+    }
+
+    .user-info span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: #b0b0b0;
+      text-decoration: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      transition: all 0.3s ease;
+      font-size: 13px;
+    }
+
+    .nav-links a:hover {
+      background-color: rgba(187, 134, 252, 0.1);
+      color: #BB86FC;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid #555;
+      color: #B0B0B0;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 18px;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+    }
+
+    .theme-toggle:hover {
+      background-color: rgba(187, 134, 252, 0.1);
+      color: #BB86FC;
+      border-color: #BB86FC;
+    }
+
+    /* Session Timer */
+    .session-timer {
+      background-color: var(--accent-light);
+      color: var(--accent-color);
+      padding: 12px 20px;
+      font-weight: 600;
+      text-align: center;
+      border-bottom: 2px solid var(--accent-color);
+    }
+
+    /* Main Container */
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 30px 20px;
+    }
+
+    /* Page Title */
+    .page-title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--accent-color);
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Filter Section */
+    .filter-section {
+      background-color: var(--bg-primary);
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+      box-shadow: var(--shadow);
+      display: flex;
+      gap: 20px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .filter-group label {
+      font-weight: 600;
+      color: var(--accent-color);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-group select {
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 2px solid var(--border-color);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 220px;
+    }
+
+    .filter-group select:hover,
+    .filter-group select:focus {
+      border-color: var(--accent-color);
+      outline: none;
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+
+    /* Collapsible Section */
+    .collapsible-section {
+      background-color: var(--bg-primary);
+      border-radius: 8px;
+      margin-bottom: 30px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .collapsible-header {
+      background-color: var(--bg-tertiary);
+      padding: 16px 20px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+      transition: all 0.3s ease;
+      border-left: 4px solid var(--accent-color);
+    }
+
+    .collapsible-header:hover {
+      background-color: var(--accent-light);
+    }
+
+    .collapsible-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .toggle-icon {
+      font-size: 18px;
+      transition: transform 0.3s ease;
+    }
+
+    .collapsible-header.active .toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    .collapsible-content {
+      padding: 20px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .collapsible-content.active {
+      max-height: 2000px;
+    }
+
+    /* Table Styles */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    th {
+      background-color: var(--table-header-bg);
+      color: var(--table-header-text);
+      padding: 14px 12px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 12px;
+      text-align: center;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 13px;
+    }
+
+    tr:nth-child(even) {
+      background-color: var(--table-row-alternate);
+    }
+
+    tr:hover {
+      background-color: var(--accent-light);
+    }
+
+    /* Button Styles */
+    button, .btn {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 12px;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-upload {
+      background-color: var(--accent-color);
+      color: white;
+    }
+
+    .btn-upload:hover {
+      background-color: #6A0C9F;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-download {
+      background-color: #FF00FF;
+      color: white;
+    }
+
+    .btn-download:hover {
+      background-color: #E600E6;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-delete {
+      background-color: var(--danger-color);
+      color: white;
+    }
+
+    .btn-delete:hover {
+      background-color: #B71C1C;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Analytics Section */
+    .analytics-section {
+      background-color: var(--bg-primary);
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: var(--shadow);
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent-color);
+      margin-bottom: 25px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 15px;
+      border-bottom: 3px solid var(--accent-color);
+    }
+
+    /* Tab Styles */
+    .tab-navigation {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      border-bottom: 2px solid var(--border-color);
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 12px 24px;
+      background-color: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tab-btn:hover {
+      color: var(--accent-color);
+    }
+
+    .tab-btn.active {
+      color: var(--accent-color);
+      border-bottom-color: var(--accent-color);
+      background-color: var(--accent-light);
+      border-radius: 6px 6px 0 0;
+    }
+
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Chart Grid */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 30px;
+      margin-bottom: 30px;
+      align-items: start;
+    }
+
+    .chart-container {
+      background-color: var(--bg-secondary);
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid var(--accent-color);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    canvas {
+      background-color: var(--bg-primary);
+      padding: 8px;
+      border-radius: 8px;
+      max-height: 280px !important;
+    }
+
+    #bankChart {
+      max-height: 320px !important;
+    }
+
+    #trendChart {
+      max-height: 220px !important;
+    }
+
+    /* Dark mode chart visibility fixes */
+    html.dark-mode canvas {
+      background-color: #252525;
+    }
+
+    /* Chart text and label visibility */
+    .chart-title {
+      color: var(--text-primary);
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+
+    /* Currency Summary */
+    .currency-table {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .currency-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      padding: 15px;
+      background-color: var(--bg-secondary);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      border-left: 4px solid var(--accent-color);
+    }
+
+    .currency-item {
+      text-align: center;
+    }
+
+    .currency-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .currency-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-color);
+    }
+
+    /* COMPREHENSIVE MOBILE RESPONSIVE DESIGN */
+    
+    /* Tablets: 1024px and below */
+    @media (max-width: 1024px) {
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .header-right {
+        gap: 10px;
+      }
+      
+      .nav-links {
+        gap: 8px;
+      }
+      
+      .nav-links a {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+      
+      .filter-group select {
+        min-width: 120px;
+      }
+      
+      .user-info {
+        font-size: 11px;
+        gap: 8px;
+      }
+    }
+    
+    /* Mobile: 768px and below */
+    @media (max-width: 768px) {
+      /* HEADER STYLES */
+      .header {
+        flex-direction: column;
+        padding: 12px 15px;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      
+      .header-left {
+        gap: 12px;
+        width: 100%;
+      }
+      
+      .logo {
+        height: 30px;
+        max-width: 100px;
+      }
+      
+      .header-title {
+        font-size: 18px;
+      }
+      
+      .header-right {
+        flex-direction: column;
+        width: 100%;
+        gap: 10px;
+      }
+      
+      .user-info {
+        flex-direction: column;
+        font-size: 11px;
+        gap: 5px;
+        width: 100%;
+        align-items: flex-start;
+      }
+      
+      .user-info span {
+        width: 100%;
+        font-size: 10px;
+      }
+      
+      .nav-links {
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+      }
+      
+      .nav-links a {
+        padding: 8px 10px;
+        font-size: 11px;
+        flex: 1;
+        min-width: 70px;
+        text-align: center;
+      }
+      
+      .theme-toggle {
+        width: 38px;
+        height: 38px;
+        padding: 6px;
+        font-size: 16px;
+      }
+      
+      /* CONTAINER & TIMER */
+      .container {
+        padding: 12px 10px;
+        max-width: 100%;
+      }
+      
+      .session-timer {
+        padding: 10px 12px;
+        font-size: 12px;
+      }
+      
+      /* PAGE TITLE */
+      .page-title {
+        font-size: 20px;
+        margin-bottom: 15px;
+        gap: 5px;
+      }
+      
+      /* FILTERS */
+      .filter-section {
+        flex-direction: column;
+        padding: 12px;
+        gap: 10px;
+      }
+      
+      .filter-group {
+        width: 100%;
+      }
+      
+      .filter-group label {
+        font-size: 11px;
+      }
+      
+      .filter-group select {
+        width: 100% !important;
+        min-width: unset !important;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+      
+      /* STATS CARDS */
+      [style*="display:flex"][style*="gap:20px"][style*="flex-wrap:wrap"] {
+        gap: 10px !important;
+        flex-direction: column !important;
+      }
+      
+      [style*="min-width:180px"] {
+        min-width: 100% !important;
+      }
+      
+      /* COLLAPSIBLE SECTIONS */
+      .collapsible-header h3 {
+        font-size: 14px;
+        gap: 5px;
+      }
+      
+      .toggle-icon {
+        font-size: 16px;
+      }
+      
+      /* TABLE WRAPPER WITH HORIZONTAL SCROLL */
+      div[style*="overflow-x: auto"] {
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -10px;
+        padding: 0 10px;
+      }
+      
+      table {
+        min-width: 1100px !important;
+        font-size: 10px;
+      }
+      
+      th {
+        padding: 8px 5px;
+        font-size: 9px;
+      }
+      
+      td {
+        padding: 6px 4px;
+        font-size: 10px;
+      }
+      
+      /* CHARTS */
+      .chart-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px;
+      }
+      
+      .chart-container {
+        padding: 10px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .chart-title {
+        font-size: 12px;
+      }
+      
+      canvas {
+        max-height: 250px !important;
+        min-height: 200px !important;
+      }
+      
+      #bankChart {
+        max-height: 350px !important;
+        min-height: 300px !important;
+      }
+      
+      #trendChart {
+        max-height: 220px !important;
+        min-height: 180px !important;
+      }
+      
+      /* BUTTONS */
+      button, .btn {
+        padding: 6px 10px;
+        font-size: 10px;
+      }
+      
+      /* TABS */
+      .tab-navigation {
+        gap: 5px;
+        margin-bottom: 15px;
+      }
+      
+      .tab-btn {
+        padding: 8px 12px;
+        font-size: 11px;
+      }
+      
+      /* SECTION TITLE */
+      .section-title {
+        font-size: 16px;
+      }
+    }
+    
+    /* Small Mobile: 480px and below */
+    @media (max-width: 480px) {
+      .header {
+        padding: 10px 8px;
+      }
+      
+      .logo {
+        height: 25px;
+        max-width: 90px;
+      }
+      
+      .header-title {
+        font-size: 14px;
+      }
+      
+      .header-right {
+        gap: 6px;
+      }
+      
+      .user-info span {
+        display: block !important;
+        width: 100%;
+      }
+      
+      .nav-links a {
+        font-size: 10px;
+        padding: 6px 8px;
+        min-width: 60px;
+      }
+      
+      .container {
+        padding: 10px 8px;
+      }
+      
+      .page-title {
+        font-size: 16px;
+      }
+      
+      .filter-group select {
+        font-size: 12px;
+      }
+      
+      table {
+        font-size: 9px;
+      }
+      
+      th {
+        padding: 6px 3px;
+        font-size: 8px;
+      }
+      
+      td {
+        padding: 5px 3px;
+        font-size: 9px;
+      }
+      
+      .collapsible-header h3 {
+        font-size: 12px;
+      }
+      
+      canvas {
+        max-height: 280px !important;
+        min-height: 240px !important;
+      }
+      
+      #bankChart {
+        max-height: 380px !important;
+        min-height: 340px !important;
+      }
+    }
+
+    /* Loading Animation */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid var(--border-color);
+      border-top-color: var(--accent-color);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <img src="{{ url_for('static', filename='avanza-logo.png') }}" alt="Logo" class="logo">
+      <div class="header-title">SLA Dashboard</div>
+    </div>
+    <div class="header-right">
+      <div class="user-info">
+        <span>👤 {{ session['username'] }}</span>
+        <span>🟢 Login: {{ login_time.strftime('%d-%b-%Y %I:%M:%S %p') if login_time else '-' }}</span>
+        <span>🔴 Logout: {{ logout_time.strftime('%d-%b-%Y %I:%M:%S %p') if logout_time else '-' }}</span>
+      </div>
+      <div class="nav-links">
+        <a href="/register">👤 Register</a>
+        {% if role == 'admin' %}
+        <a href="{{ url_for('licenses') }}">📋 Licenses</a>
+        <a href="{{ url_for('change_password') }}">🔐 Password</a>
+        {% endif %}
+        <a href="{{ url_for('sla_page') }}">📊 SLA</a>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌙</button>
+        <a href="/logout" style="color: #FF6B6B;">🚪 Logout</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Timer -->
+  <div class="session-timer">
+    ⏱️ Session Time: <span id="session-timer">00:00:00</span>
+  </div>
+
+  <!-- Main Container -->
+  <div class="container">
+    <div class="page-title">📊 SLA & License Management Portal</div>
+
+    <!-- Global Filters for All Data -->
+    <div style="background-color: var(--bg-secondary); padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <label style="font-weight: 600; color: var(--text-primary);">🏦 Filter by Bank:</label>
+        <select id="bank" style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); background-color: var(--bg-primary); color: var(--text-primary); cursor: pointer; min-width: 200px;" onchange="applyAllFilters()">
+          <option value="">All Banks</option>
+          {% for bank in all_banks %}
+            <option value="{{ bank }}" {% if bank == selected_bank %}selected{% endif %}>{{ bank }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <label style="font-weight: 600; color: var(--text-primary);">📅 Filter by Year:</label>
+        <select id="year" style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); background-color: var(--bg-primary); color: var(--text-primary); cursor: pointer; min-width: 150px;" onchange="applyAllFilters()">
+          <option value="">All Years</option>
+          <option value="2026">2026</option>
+          <option value="2025">2025</option>
+          <option value="2024">2024</option>
+        </select>
+      </div>
+      <span style="color: var(--text-secondary); font-size: 12px;">✓ Applies to SLA Table and all charts</span>
+    </div>
+
+    <!-- Active / Inactive Status Summary Cards -->
+    <div style="display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:180px;background:var(--bg-primary);border-radius:8px;padding:20px;box-shadow:var(--shadow);border-left:5px solid #4CAF50;text-align:center;">
+        <div style="font-size:12px;text-transform:uppercase;font-weight:600;color:#4CAF50;margin-bottom:8px;">✅ Active Clients</div>
+        <div style="font-size:36px;font-weight:700;color:#4CAF50;">{{ active_count }}</div>
+      </div>
+      <div style="flex:1;min-width:180px;background:var(--bg-primary);border-radius:8px;padding:20px;box-shadow:var(--shadow);border-left:5px solid #D32F2F;text-align:center;">
+        <div style="font-size:12px;text-transform:uppercase;font-weight:600;color:#D32F2F;margin-bottom:8px;">❌ Inactive Clients</div>
+        <div style="font-size:36px;font-weight:700;color:#D32F2F;">{{ inactive_count }}</div>
+      </div>
+      <div style="flex:1;min-width:180px;background:var(--bg-primary);border-radius:8px;padding:20px;box-shadow:var(--shadow);border-left:5px solid var(--accent-color);text-align:center;">
+        <div style="font-size:12px;text-transform:uppercase;font-weight:600;color:var(--accent-color);margin-bottom:8px;">🏦 Total Clients</div>
+        <div style="font-size:36px;font-weight:700;color:var(--accent-color);">{{ active_count + inactive_count }}</div>
+      </div>
+    </div>
+
+    <!-- SLA Data Table (Collapsible) -->
+    <div class="collapsible-section">
+      <div class="collapsible-header" onclick="toggleCollapsible(this)">
+        <h3>
+          <span>📋</span>
+          SLA Data Table
+          <span style="font-size: 12px; color: var(--text-secondary);">(Click to expand/collapse)</span>
+        </h3>
+        <span class="toggle-icon">▼</span>
+      </div>
+      <div class="collapsible-content">
+        <div style="overflow-x: auto; overflow-y: auto; max-height: 600px; border: 1px solid var(--border-color); border-radius: 4px;">
+          <table style="min-width: 100%;">
+            <thead style="position: sticky; top: 0; z-index: 10;">
+              <tr style="background-color: var(--accent-color); color: white;">
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color); cursor: pointer; user-select: none;" onclick="sortTableByBankName()" title="Click to sort A-Z">
+                  Bank Name <span id="bankSortIcon" style="font-size: 12px; margin-left: 5px;">↕️</span>
+                </th>
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Period</th>
+                {% for year_col in available_years %}
+                  <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">{{ year_col.replace('YEAR_', '') }}</th>
+                {% endfor %}
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Difference</th>
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Increment (%)</th>
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Status</th>
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Doc Type</th>
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Upload Date</th>
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Modified Date</th>
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Document</th>
+                <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="slaTableBody">
+              {% for row in data %}
+              <tr class="sla-row" data-bank="{{ row['BANK_NAME'] }}" style="background-color: var(--bg-primary); color: var(--text-primary);">
+                <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">{{ row['BANK_NAME'] }}</td>
+                <td contenteditable="{{ 'true' if role == 'admin' else 'false' }}" onblur="updateField(this, '{{ row['BANK_NAME'] }}', '{{ row['PERIOD'] }}', 'PERIOD')" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+                  {{ row['PERIOD'] }}
+                </td>
+                {% for year_col in available_years %}
+                <td contenteditable="{{ 'true' if role == 'admin' else 'false' }}" onblur="updateField(this, '{{ row['BANK_NAME'] }}', '{{ row['PERIOD'] }}', '{{ year_col }}')" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+                  {{ "{:,}".format(row.get(year_col, 0)|float|round(0)) }}
+                </td>
+                {% endfor %}
+                <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">{{ "{:,.0f}".format(row['DIFFERENCE']) if row['DIFFERENCE'] is not none else "-" }}</td>
+                <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+                  {% if row['INCREMENT'] is defined and row['INCREMENT'] is not none %}
+                    <span style="color: {% if row['INCREMENT'] > 0 %}#4CAF50{% else %}#FF9800{% endif %};">{{ "{:.2f}".format(row['INCREMENT']) }}%</span>
+                  {% else %}
+                    <span>0.00%</span>
+                  {% endif %}
+                </td>
+                <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+                  {% if role == 'admin' %}
+                  <select onchange="updateStatus('{{ row['BANK_NAME'] }}', '{{ row['PERIOD'] }}', this.value)"
+                    style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;background:var(--bg-primary);color:var(--text-primary);font-size:12px;cursor:pointer;">
+                    <option value="Active" {% if (row['STATUS'] or '') != 'Inactive' %}selected{% endif %}>✅ Active</option>
+                    <option value="Inactive" {% if row['STATUS'] == 'Inactive' %}selected{% endif %}>❌ Inactive</option>
+                  </select>
+                  {% else %}
+                    {% if row['STATUS'] == 'Inactive' %}
+                    <span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;background:#FFEBEE;color:#C62828;">❌ Inactive</span>
+                    {% else %}
+                    <span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;background:#E8F5E9;color:#2E7D32;">✅ Active</span>
+                    {% endif %}
+                  {% endif %}
+                </td>
+                <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+                  {% if role == 'admin' %}
+                  <select onchange="updateStatus('{{ row['BANK_NAME'] }}', '{{ row['PERIOD'] }}', this.value, 'DOC_TYPE')"
+                    style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;background:var(--bg-primary);color:var(--text-primary);font-size:12px;cursor:pointer;min-width:110px;">
+                    <option value="Agreement" {% if (row.get('DOC_TYPE') or 'Agreement') == 'Agreement' %}selected{% endif %}>📄 Agreement</option>
+                    <option value="Addendum"  {% if row.get('DOC_TYPE') == 'Addendum' %}selected{% endif %}>📝 Addendum</option>
+                  </select>
+                  {% else %}
+                    <span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;background:#EDE7F6;color:#4B0082;">
+                      {{ row.get('DOC_TYPE') or 'Agreement' }}
+                    </span>
+                  {% endif %}
+                </td>
+                <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">{{ (row['UPLOAD_DATE']|string or '-')[:10] }}</td>
+                <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">{{ (row['MODIFIED_DATE']|string or '-')[:10] }}</td>
+                <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+                  {% set fname = row.get('SLA_DOC_FILENAME') %}
+                  {% if fname and fname == fname and fname != 'nan' and fname != '' %}
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                      <span style="font-size:11px;word-break:break-all;max-width:140px;" title="{{ fname }}">📎 {{ fname[:22] }}{% if fname|length > 22 %}…{% endif %}</span>
+                      <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#EDE7F6;color:#4B0082;font-weight:600;">{{ row.get('DOC_TYPE') or 'Agreement' }}</span>
+                    </div>
+                  {% else %}
+                    <span style="color: var(--text-secondary);font-size:12px;">No file</span>
+                  {% endif %}
+                </td>
+                <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+                  <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+                  {% set fname = row.get('SLA_DOC_FILENAME') %}
+                  {% if fname and fname == fname and fname != 'nan' and fname != '' %}
+                    <a class="btn btn-download" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;" href="/download?bank={{ row['BANK_NAME'] }}&period={{ row['PERIOD'] }}" target="_blank" rel="noopener noreferrer">⬇️</a>
+                    {% if role == 'admin' %}
+                    <form method="POST" action="/delete" style="margin:0;">
+                      <input type="hidden" name="bank" value="{{ row['BANK_NAME'] }}">
+                      <input type="hidden" name="period" value="{{ row['PERIOD'] }}">
+                      <button class="btn btn-delete" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;" type="submit">🗑️</button>
+                    </form>
+                    {% endif %}
+                  {% endif %}
+                  {% if role == 'admin' %}
+                  <form method="POST" action="/upload" enctype="multipart/form-data" style="margin:0;">
+                    <input type="hidden" name="bank" value="{{ row['BANK_NAME'] }}">
+                    <input type="hidden" name="period" value="{{ row['PERIOD'] }}">
+                    <input type="hidden" name="doc_type" class="doc-type-hidden" value="{{ row.get('DOC_TYPE') or 'Agreement' }}">
+                    <input type="file" name="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
+                      style="display:none;"
+                      onchange="this.previousElementSibling.value=this.closest('tr').querySelector('select[data-doctype]') ? this.closest('tr').querySelector('select[data-doctype]').value : 'Agreement'; this.form.submit()">
+                    <button class="btn btn-upload" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;" type="button" onclick="this.previousElementSibling.click()">📤</button>
+                  </form>
+                  {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+          </table>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- Analytics Dashboard -->
+    <div class="analytics-section">
+      <div class="section-title">📊 Analytics Dashboard</div>
+
+      <!-- Tab Navigation -->
+      <div class="tab-navigation">
+        <button class="tab-btn active" onclick="switchTab(event, 'sla-usage')">📈 SLA Analysis</button>
+        <button class="tab-btn" onclick="switchTab(event, 'license-usage')">🔐 License Analysis</button>
+      </div>
+
+      <!-- SLA Usage Tab -->
+      <div id="sla-usage" class="tab-content active">
+        <div class="chart-grid">
+          <div class="chart-container">
+            <div class="chart-title">💱 SLA Distribution by Currency</div>
+            <canvas id="currencyChart"></canvas>
+          </div>
+          <div class="chart-container" id="bankChartContainer">
+            <div class="chart-title" id="bankChartTitleContainer">🏦 SLA Amount by Bank</div>
+            <canvas id="bankChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-container" style="margin-top:0;">
+          <div class="chart-title" id="trendChartTitle">📉 SLA Usage Trend</div>
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+
+      <!-- License Usage Tab -->
+      <div id="license-usage" class="tab-content">
+        <!-- License charts use Bank and Year filters from above -->
+        <div style="background-color: var(--bg-secondary); padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">
+          💡 License charts automatically update when you change the Bank or Year filters above
+        </div>
+        <div class="chart-grid">
+          <div class="chart-container">
+            <div class="chart-title">🔵 RDV License Status</div>
+            <canvas id="rdvStatusChart"></canvas>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">🟣 Nimbus License Status</div>
+            <canvas id="nimbusStatusChart"></canvas>
+          </div>
+        </div>
+        
+        <div class="chart-grid">
+          <div class="chart-container">
+            <div class="chart-title">📊 RDV vs Nimbus Distribution</div>
+            <canvas id="licenseDistributionChart"></canvas>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">⚙️ License Features Usage</div>
+            <canvas id="featuresChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Recent Changes Table -->
+        <div style="margin-top: 30px;">
+          <h3 style="color: var(--accent-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+            <span>🔄</span> Recent License Changes
+          </h3>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Client</th>
+                  <th>Field Changed</th>
+                  <th>Old Value</th>
+                  <th>New Value</th>
+                  <th>Changed By</th>
+                  <th>Date/Time</th>
+                </tr>
+              </thead>
+              <tbody id="changesLog">
+                <tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    // Theme Toggle
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDarkMode = html.classList.toggle('dark-mode');
+      localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+      updateThemeIcon();
+      
+      // Redraw all charts with new colors
+      setTimeout(() => {
+        reloadChartsWithNewTheme();
+      }, 100);
+    }
+
+    function updateThemeIcon() {
+      const icon = document.querySelector('.theme-toggle');
+      const isDarkMode = document.documentElement.classList.contains('dark-mode');
+      icon.textContent = isDarkMode ? '☀️' : '🌙';
+    }
+
+    function reloadChartsWithNewTheme() {
+      const selectedYear = document.getElementById('year') ? document.getElementById('year').value : '';
+      const selectedBank = document.getElementById('bank') ? document.getElementById('bank').value : '';
+      
+      // Reload charts by calling loadCharts
+      loadCharts(selectedYear, selectedBank);
+    }
+
+    // Bank Name Sorting - Global state
+    let bankSortOrder = 'asc'; // 'asc' or 'desc'
+
+    function sortTableByBankName() {
+      const tbody = document.getElementById('slaTableBody');
+      const icon = document.getElementById('bankSortIcon');
+      const rows = Array.from(document.querySelectorAll('#slaTableBody .sla-row'));
+
+      // Sort rows by bank name
+      rows.sort((a, b) => {
+        const bankA = a.getAttribute('data-bank') || '';
+        const bankB = b.getAttribute('data-bank') || '';
+        
+        if (bankSortOrder === 'asc') {
+          return bankA.localeCompare(bankB);
+        } else {
+          return bankB.localeCompare(bankA);
+        }
+      });
+
+      // Use fragment for efficient DOM updates
+      const fragment = document.createDocumentFragment();
+      rows.forEach(row => fragment.appendChild(row));
+      tbody.innerHTML = '';
+      tbody.appendChild(fragment);
+
+      // Toggle sort order
+      bankSortOrder = bankSortOrder === 'asc' ? 'desc' : 'asc';
+
+      // Update icon
+      icon.textContent = bankSortOrder === 'asc' ? '↑ A-Z' : '↓ Z-A';
+
+      // Re-apply filter after sort
+      const selectedBank = document.getElementById('bank').value || '';
+      const filteredRows = document.querySelectorAll('#slaTableBody .sla-row');
+      filteredRows.forEach(row => {
+        const bankName = row.getAttribute('data-bank');
+        if (selectedBank === '' || bankName === selectedBank) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    }
+
+    // Update STATUS or DOC_TYPE field for SLA row
+    function updateStatus(bank, period, value, field) {
+      var f = field || 'STATUS';
+      fetch('/update_field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bank: bank, period: period, field: f, value: value })
+      }).then(r => r.json()).then(res => {
+        if (!res.success) alert('Failed to update ' + f + ': ' + (res.message || ''));
+      });
+    }
+
+    // Apply all filters (table + charts)
+    function applyAllFilters() {
+      const selectedBank = document.getElementById('bank').value || '';
+      const selectedYear = document.getElementById('year').value || '';
+      
+      console.log('🔄 Applying filters - Bank:', selectedBank || 'All Banks', 'Year:', selectedYear || 'All Years');
+      
+      // Filter SLA Data Table
+      const rows = document.querySelectorAll('#slaTableBody .sla-row');
+      rows.forEach(row => {
+        const bankName = row.getAttribute('data-bank');
+        if (selectedBank === '' || bankName === selectedBank) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+
+      // Always reload charts when ANY filter changes
+      console.log('📊 Triggering chart reload...');
+      reloadChartsWithNewFilters();
+    }
+
+    // Reload charts with new filters
+    async function reloadChartsWithNewFilters() {
+      const selectedYear = document.getElementById('year').value || '';
+      const selectedBank = document.getElementById('bank').value || '';
+      
+      console.log('🔄 reloadChartsWithNewFilters - Bank:', selectedBank || 'All', 'Year:', selectedYear || 'All');
+      
+      // Build URL with both filters
+      const params = new URLSearchParams();
+      if (selectedBank) {
+        params.append('bank', selectedBank);
+        console.log('  ✓ Adding bank param:', selectedBank);
+      }
+      if (selectedYear) {
+        params.append('year', selectedYear);
+        console.log('  ✓ Adding year param:', selectedYear);
+      }
+      
+      const newUrl = params.toString() ? '?' + params.toString() : '/dashboard';
+      console.log('📍 New URL:', newUrl);
+      window.history.replaceState({}, '', newUrl);
+      
+      // Fetch and render charts
+      console.log('⏳ Waiting 150ms before fetching charts...');
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      console.log('📊 Now calling loadCharts()...');
+      await loadCharts();
+    }
+
+    // Get chart colors based on theme
+    function getChartColors() {
+      const isDarkMode = document.documentElement.classList.contains('dark-mode');
+      return {
+        isDark: isDarkMode,
+        textColor: isDarkMode ? '#ffffff' : '#7B2D7F',
+        gridColor: isDarkMode ? '#444444' : '#e0e0e0',
+        borderColor: isDarkMode ? '#555555' : '#cccccc',
+        accentColor: '#9C27B0',
+        accentColor2: '#2196F3',
+        accentColor3: '#FF9800',
+        accentColor4: '#4CAF50'
+      };
+    }
+
+    // Load theme on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark-mode');
+      }
+      updateThemeIcon();
+    });
+
+    // Collapsible Section
+    function toggleCollapsible(header) {
+      header.classList.toggle('active');
+      const content = header.nextElementSibling;
+      content.classList.toggle('active');
+    }
+
+    // Tab Switching
+    function switchTab(event, tabName) {
+      event.preventDefault();
+      
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      
+      // Deactivate all buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      // Show selected tab
+      document.getElementById(tabName).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // Session Timer
+    let sessionStart = new Date("{{ session['login_time'] }}");
+
+    function updateSessionTimer() {
+      let now = new Date();
+      let diff = new Date(now - sessionStart);
+
+      let hours = String(diff.getUTCHours()).padStart(2, '0');
+      let minutes = String(diff.getUTCMinutes()).padStart(2, '0');
+      let seconds = String(diff.getUTCSeconds()).padStart(2, '0');
+
+      document.getElementById('session-timer').innerText = `${hours}:${minutes}:${seconds}`;
+    }
+
+    setInterval(updateSessionTimer, 1000);
+
+    // Update Field
+    function updateField(cell, bank, period, field) {
+      let newValue = cell.innerText.trim().replace(/,/g, '');
+
+      fetch("/update_field", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bank, period, field, value: newValue })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) {
+          alert("Update failed: " + data.message);
+        } else {
+          // ✅ Auto-reload charts after successful cell update
+          console.log('✅ Cell updated successfully, reloading charts...');
+          setTimeout(() => {
+            loadCharts();
+          }, 300);
+        }
+      })
+      .catch(error => {
+        console.error('Error updating field:', error);
+        alert('خرابی: ' + error);
+      });
+    }
+
+    // Load Charts
+    async function loadCharts() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedBank = urlParams.get('bank') || '';
+        const selectedYear = urlParams.get('year') || '';
+        
+        console.log('📊 Loading charts with params - Bank:', selectedBank, 'Year:', selectedYear);
+        
+        const queryString = new URLSearchParams();
+        if (selectedBank) queryString.append('bank', selectedBank);
+        if (selectedYear) queryString.append('year', selectedYear);
+        const queryParam = queryString.toString() ? '?' + queryString.toString() : '';
+        
+        console.log('🔗 Fetching from /api/sla-usage-data' + queryParam);
+        const slaRes = await fetch('/api/sla-usage-data' + queryParam);
+        if (!slaRes.ok) throw new Error(`SLA API error: ${slaRes.status}`);
+        const slaData = await slaRes.json();
+        
+        console.log('✅ SLA Data received:', slaData);
+        
+        const licRes = await fetch('/api/license-usage-data' + queryParam);
+        if (!licRes.ok) throw new Error(`License API error: ${licRes.status}`);
+        const licData = await licRes.json();
+        
+        console.log('✅ License Data received:', licData);
+        
+        // Render SLA Charts
+        if (slaData && slaData.currency_distribution) {
+          console.log('📈 Rendering Currency Chart with data:', slaData.currency_distribution);
+          renderCurrencyChart(slaData.currency_distribution);
+        } else {
+          console.warn('⚠️ Currency distribution data missing or empty');
+        }
+        if (slaData && slaData.bank_distribution) {
+          console.log('📈 Rendering Bank Chart with data:', slaData.bank_distribution);
+          renderBankChart(slaData.bank_distribution, selectedYear, selectedBank);
+        } else {
+          console.warn('⚠️ Bank distribution data missing or empty');
+        }
+        if (slaData && slaData.trend_data) {
+          console.log('📈 Rendering Trend Chart');
+          renderTrendChart(slaData.trend_data, selectedYear);
+        }
+        
+        // Render License Charts
+        if (licData && licData.rdv_status) {
+          console.log('📈 Rendering Status Charts');
+          renderStatusCharts(licData);
+        }
+        if (licData && licData.license_type_distribution) {
+          console.log('📈 Rendering License Distribution Chart');
+          renderLicenseDistributionChart(licData.license_type_distribution);
+        }
+        if (licData && licData.features_usage) {
+          console.log('📈 Rendering Features Chart');
+          renderFeaturesChart(licData.features_usage);
+        }
+        if (licData && licData.recent_changes) {
+          console.log('📝 Populating Changes Log');
+          populateChangesLog(licData.recent_changes);
+        }
+        
+        console.log('✅ All charts rendered successfully!');
+      } catch (error) {
+        console.error('❌ Error loading charts:', error);
+      }
+    }
+
+    // Chart Functions
+    function renderCurrencyChart(data) {
+      console.log('🎨 renderCurrencyChart called with data:', data);
+      
+      if (!data || data.length === 0) {
+        console.warn('⚠️ Currency chart - No data received, skipping render');
+        return;
+      }
+      
+      console.log('✅ Currency chart - Data length:', data.length);
+      
+      // Make sure canvas exists
+      const canvas = document.getElementById('currencyChart');
+      if (!canvas) {
+        console.error('❌ Currency chart canvas not found!');
+        return;
+      }
+      
+      const ctx = canvas.getContext('2d');
+      const colors = getChartColors();
+      const labels = data.map(d => d.currency);
+      const values = data.map(d => d.amount);
+      
+      console.log('📊 Currency labels:', labels);
+      console.log('💰 Currency values:', values);
+      
+      const chartColors = labels.map(l => l === 'PKR' ? colors.accentColor : colors.accentColor2);
+      
+      // Destroy old instance if it exists
+      if (window.currencyChartInstance) {
+        console.log('🗑️ Destroying old currency chart instance');
+        window.currencyChartInstance.destroy();
+      }
+      
+      console.log('🎬 Creating new currency chart...');
+      window.currencyChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: chartColors,
+            borderColor: colors.isDark ? '#252525' : '#ffffff',
+            borderWidth: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { 
+              position: 'bottom',
+              labels: {
+                color: colors.textColor,
+                font: { size: 13, weight: '600' }
+              }
+            },
+            tooltip: {
+              backgroundColor: colors.isDark ? '#333333' : '#ffffff',
+              titleColor: colors.textColor,
+              bodyColor: colors.textColor,
+              borderColor: colors.borderColor,
+              borderWidth: 1,
+              callbacks: {
+                label: function(context) {
+                  return context.label + ': ' + context.parsed.toLocaleString();
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      console.log('✅ Currency chart rendered successfully!');
+    }
+
+    function renderBankChart(data, selectedYear, selectedBank) {
+      if (!data || Object.keys(data).length === 0) return;
+      
+      const colors = getChartColors();
+      const yearDisplay = selectedYear || 'All Years';
+      const bankDisplay = selectedBank ? `(${selectedBank})` : '(All Banks)';
+      
+      document.getElementById('bankChartTitleContainer').textContent = `🏦 SLA Amount by Bank ${bankDisplay} ${yearDisplay}`;
+      
+      // Create tabs for USD and PKR if they don't exist
+      const chartContainer = document.getElementById('bankChartContainer');
+      if (!document.getElementById('bankChartTabs')) {
+        const tabsHTML = `
+          <div id="bankChartTabs" style="margin-bottom: 15px; display: flex; gap: 10px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">
+            <button id="bankTabUSD" class="btn" onclick="switchBankChart('USD')" style="padding: 8px 16px; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer;">💵 USD</button>
+            <button id="bankTabPKR" class="btn" onclick="switchBankChart('PKR')" style="padding: 8px 16px; background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;">💴 PKR</button>
+          </div>
+        `;
+        chartContainer.insertAdjacentHTML('beforeend', tabsHTML);
+      }
+      
+      // Store data globally for switching
+      window.bankDataByCurrency = data;
+      window.selectedBankChart = 'USD';
+      
+      // Render USD chart
+      renderBankChartForCurrency(data.USD || [], 'USD', colors);
+    }
+    
+    function switchBankChart(currency) {
+      if (!window.bankDataByCurrency) return;
+      
+      // Update tab styling
+      document.getElementById('bankTabUSD').style.backgroundColor = currency === 'USD' ? 'var(--accent-color)' : 'var(--bg-secondary)';
+      document.getElementById('bankTabUSD').style.color = currency === 'USD' ? 'white' : 'var(--text-primary)';
+      document.getElementById('bankTabUSD').style.border = currency === 'USD' ? 'none' : '1px solid var(--border-color)';
+      
+      document.getElementById('bankTabPKR').style.backgroundColor = currency === 'PKR' ? 'var(--accent-color)' : 'var(--bg-secondary)';
+      document.getElementById('bankTabPKR').style.color = currency === 'PKR' ? 'white' : 'var(--text-primary)';
+      document.getElementById('bankTabPKR').style.border = currency === 'PKR' ? 'none' : '1px solid var(--border-color)';
+      
+      window.selectedBankChart = currency;
+      const colors = getChartColors();
+      renderBankChartForCurrency(window.bankDataByCurrency[currency] || [], currency, colors);
+    }
+    
+    function renderBankChartForCurrency(data, currency, colors) {
+      if (!data || data.length === 0) {
+        // Show empty state
+        return;
+      }
+      
+      const ctx = document.getElementById('bankChart').getContext('2d');
+      const labels = data.map(d => d.bank);
+      const values = data.map(d => d.amount);
+      const currencyColor = currency === 'USD' ? '#3F51B5' : '#FF9800';
+      
+      if (window.bankChartInstance) window.bankChartInstance.destroy();
+      
+      // Set dynamic height based on number of banks
+      const numBanks = labels.length;
+      const minHeight = Math.min(Math.max(250, numBanks * 22 + 80), 380);
+      document.getElementById('bankChart').style.height = minHeight + 'px';
+      document.getElementById('bankChart').style.maxHeight = minHeight + 'px';
+      document.getElementById('bankChartContainer').style.minHeight = '';
+      
+      window.bankChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `Amount (${currency})`,
+            data: values,
+            backgroundColor: currencyColor,
+            borderColor: currencyColor,
+            borderWidth: 2
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: `SLA Amount by Bank - ${currency}`,
+              color: colors.textColor,
+              font: { size: 14, weight: '600' }
+            },
+            legend: { 
+              display: true,
+              labels: { color: colors.textColor, font: { size: 12 } }
+            },
+            datalabels: {
+              anchor: 'end',
+              align: 'end',
+              color: colors.textColor,
+              font: { size: 10, weight: 'bold' },
+              formatter: function(value) {
+                return value.toLocaleString();
+              }
+            },
+            tooltip: {
+              backgroundColor: colors.isDark ? '#333333' : '#ffffff',
+              titleColor: colors.textColor,
+              bodyColor: colors.textColor,
+              borderColor: colors.borderColor,
+              borderWidth: 1,
+              callbacks: {
+                label: function(context) {
+                  return context.label + ': ' + context.parsed.x.toLocaleString();
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { 
+                color: colors.textColor,
+                callback: v => v.toLocaleString()
+              },
+              grid: { color: colors.gridColor },
+              title: { display: true, text: 'Amount', color: colors.textColor }
+            },
+            y: {
+              ticks: { 
+                color: colors.textColor, 
+                font: { size: 7, weight: 'normal' },
+                autoSkip: false,
+                maxRotation: 45,
+                padding: 2
+              },
+              grid: { color: colors.gridColor }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTrendChart(data, selectedYear) {
+      if (data.length === 0) return;
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      const colors = getChartColors();
+      const periods = data.map(d => d.period);
+      
+      // Dynamically detect available years from data properties
+      const yearColors = {
+        2021: { border: '#FF9800', bg: 'rgba(255, 152, 0, 0.15)' },
+        2022: { border: '#00BCD4', bg: 'rgba(0, 188, 212, 0.15)' },
+        2023: { border: '#36A2EB', bg: 'rgba(54, 162, 235, 0.15)' },
+        2024: { border: '#FFCE56', bg: 'rgba(255, 206, 86, 0.15)' },
+        2025: { border: '#4BC0C0', bg: 'rgba(75, 192, 192, 0.15)' },
+        2026: { border: '#9C27B0', bg: 'rgba(156, 39, 176, 0.15)' },
+        2027: { border: '#FF6B6B', bg: 'rgba(255, 107, 107, 0.15)' },
+        2028: { border: '#20C997', bg: 'rgba(32, 201, 151, 0.15)' },
+        2029: { border: '#FFA94D', bg: 'rgba(255, 169, 77, 0.15)' },
+        2030: { border: '#A8E6CF', bg: 'rgba(168, 230, 207, 0.15)' }
+      };
+      
+      const availableYears = [];
+      const datasets = [];
+      
+      // Detect available years from data properties (yXXXX format)
+      // First, get all unique year keys from all data objects
+      const yearKeys = new Set();
+      data.forEach(d => {
+        Object.keys(d).forEach(key => {
+          if (key.match(/^y\d{4}$/)) {
+            yearKeys.add(key);
+          }
+        });
+      });
+      
+      // Convert year keys to sorted array of years
+      const years = Array.from(yearKeys)
+        .map(key => parseInt(key.substring(1)))
+        .sort((a, b) => a - b);
+      
+      // Create datasets for years with data
+      years.forEach(year => {
+        const yearKey = 'y' + year;
+        const yearData = data.map(d => d[yearKey] || 0);
+        
+        // Check if any data exists for this year
+        if (yearData.some(val => val !== null && val !== undefined && val !== 0)) {
+          availableYears.push(year);
+          datasets.push({
+            label: year.toString(),
+            data: yearData,
+            borderColor: yearColors[year]?.border || '#999999',
+            backgroundColor: yearColors[year]?.bg || 'rgba(153, 153, 153, 0.15)',
+            tension: 0.4,
+            fill: true,
+            borderWidth: 3
+          });
+        }
+      });
+      
+      // Update chart title with available years
+      let yearRange = availableYears.length > 0 
+        ? `(${availableYears[0]}-${availableYears[availableYears.length - 1]})`
+        : '';
+      document.getElementById('trendChartTitle').innerText = `📉 SLA Usage Trend ${yearRange}`;
+      
+      if (window.trendChartInstance) window.trendChartInstance.destroy();
+      
+      window.trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: periods,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          plugins: { 
+            legend: { 
+              position: 'bottom',
+              labels: {
+                color: colors.textColor,
+                font: { size: 12, weight: '600' }
+              }
+            },
+            tooltip: {
+              backgroundColor: colors.isDark ? '#333333' : '#ffffff',
+              titleColor: colors.textColor,
+              bodyColor: colors.textColor,
+              borderColor: colors.borderColor,
+              borderWidth: 1
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: colors.textColor },
+              grid: { color: colors.gridColor }
+            },
+            y: { 
+              ticks: { 
+                color: colors.textColor,
+                callback: v => v.toLocaleString()
+              },
+              grid: { color: colors.gridColor }
+            }
+          }
+        }
+      });
+    }
+
+    function renderStatusCharts(data) {
+      const colors = getChartColors();
+      
+      // Fix RDV Status - convert object to array if needed
+      let rdvStatusArray = data.rdv_status;
+      if (rdvStatusArray && !Array.isArray(rdvStatusArray)) {
+        rdvStatusArray = [rdvStatusArray];
+      }
+      
+      if (rdvStatusArray && rdvStatusArray.length > 0) {
+        const rdvCtx = document.getElementById('rdvStatusChart').getContext('2d');
+        const rdvLabels = rdvStatusArray.map(d => d.STATUS || d.status);
+        const rdvValues = rdvStatusArray.map(d => d.count);
+        
+        if (window.rdvStatusChartInstance) window.rdvStatusChartInstance.destroy();
+        
+        window.rdvStatusChartInstance = new Chart(rdvCtx, {
+          type: 'doughnut',
+          data: {
+            labels: rdvLabels,
+            datasets: [{
+              data: rdvValues,
+              backgroundColor: ['#4CAF50', '#FF9800', '#F44336'],
+              borderWidth: 3,
+              borderColor: colors.isDark ? '#252525' : '#ffffff'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+              legend: { 
+                position: 'bottom',
+                labels: {
+                  color: colors.textColor,
+                  font: { size: 12, weight: '600' }
+                }
+              },
+              tooltip: {
+                backgroundColor: colors.isDark ? '#333333' : '#ffffff',
+                titleColor: colors.textColor,
+                bodyColor: colors.textColor,
+                borderColor: colors.borderColor,
+                borderWidth: 1
+              }
+            }
+          }
+        });
+      }
+      
+      // Fix Nimbus Status - convert object to array if needed
+      let nimbusStatusArray = data.nimbus_status;
+      if (nimbusStatusArray && !Array.isArray(nimbusStatusArray)) {
+        nimbusStatusArray = [nimbusStatusArray];
+      }
+      
+      if (nimbusStatusArray && nimbusStatusArray.length > 0) {
+        const nimbusCtx = document.getElementById('nimbusStatusChart').getContext('2d');
+        const nimbusLabels = nimbusStatusArray.map(d => d.STATUS || d.status);
+        const nimbusValues = nimbusStatusArray.map(d => d.count);
+        
+        if (window.nimbusStatusChartInstance) window.nimbusStatusChartInstance.destroy();
+        
+        window.nimbusStatusChartInstance = new Chart(nimbusCtx, {
+          type: 'doughnut',
+          data: {
+            labels: nimbusLabels,
+            datasets: [{
+              data: nimbusValues,
+              backgroundColor: ['#2196F3', '#FF5722', '#9C27B0'],
+              borderWidth: 3,
+              borderColor: colors.isDark ? '#252525' : '#ffffff'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+              legend: { 
+                position: 'bottom',
+                labels: {
+                  color: colors.textColor,
+                  font: { size: 12, weight: '600' }
+                }
+              },
+              tooltip: {
+                backgroundColor: colors.isDark ? '#333333' : '#ffffff',
+                titleColor: colors.textColor,
+                bodyColor: colors.textColor,
+                borderColor: colors.borderColor,
+                borderWidth: 1
+              }
+            }
+          }
+        });
+      }
+    }
+
+    function renderLicenseTypeChart(data) {
+      if (data.length === 0) return;
+      const ctx = document.getElementById('licenseTypeChart').getContext('2d');
+      const colors = getChartColors();
+      const labels = data.map(d => d.type);
+      const values = data.map(d => d.count);
+      
+      if (window.licenseTypeChartInstance) window.licenseTypeChartInstance.destroy();
+      
+      window.licenseTypeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Count',
+            data: values,
+            backgroundColor: ['#9C27B0', '#009688'],
+            borderWidth: 2,
+            borderColor: '#6A0C9F'
+          }]
+        },
+        options: {
+          responsive: true,
+          indexAxis: 'y',
+          plugins: { 
+            legend: { 
+              display: false,
+              labels: { color: colors.textColor }
+            },
+            tooltip: {
+              backgroundColor: colors.isDark ? '#333333' : '#ffffff',
+              titleColor: colors.textColor,
+              bodyColor: colors.textColor,
+              borderColor: colors.borderColor,
+              borderWidth: 1
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: colors.textColor },
+              grid: { color: colors.gridColor }
+            },
+            y: {
+              ticks: { color: colors.textColor },
+              grid: { color: colors.gridColor }
+            }
+          }
+        }
+      });
+    }
+
+    function renderFeaturesChart(data) {
+      const ctx = document.getElementById('featuresChart').getContext('2d');
+      const colors = getChartColors();
+      const labels = Object.keys(data);
+      const values = Object.values(data);
+      
+      if (window.featuresChartInstance) window.featuresChartInstance.destroy();
+      
+      window.featuresChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Usage Count',
+            data: values,
+            backgroundColor: '#FF6B6B',
+            borderColor: '#FF0000',
+            borderWidth: 2,
+            datalabels: {
+              anchor: 'center',
+              align: 'center',
+              color: colors.textColor,
+              font: { size: 11, weight: 'bold' },
+              formatter: function(value) {
+                return value || '0';
+              }
+            }
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { 
+            legend: { 
+              display: false,
+              labels: { color: colors.textColor }
+            },
+            tooltip: {
+              backgroundColor: colors.isDark ? '#333333' : '#ffffff',
+              titleColor: colors.textColor,
+              bodyColor: colors.textColor,
+              borderColor: colors.borderColor,
+              borderWidth: 1
+            }
+          },
+          scales: { 
+            x: {
+              ticks: { color: colors.textColor },
+              grid: { color: colors.gridColor },
+              min: 0,
+              max: Math.max(1, Math.max(...values))
+            },
+            y: { 
+              beginAtZero: true,
+              ticks: { color: colors.textColor, font: { size: 11 } },
+              grid: { color: colors.gridColor }
+            }
+          }
+        }
+      });
+    }
+
+    function renderLicenseDistributionChart(data) {
+      if (!data || data.length === 0) return;
+      
+      const ctx = document.getElementById('licenseDistributionChart').getContext('2d');
+      const colors = getChartColors();
+      const labels = data.map(d => d.type || 'Unknown');
+      const values = data.map(d => d.count || 0);
+      
+      if (window.licenseDistChartInstance) window.licenseDistChartInstance.destroy();
+      
+      window.licenseDistChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: ['#FF9800', '#9C27B0'],
+            borderWidth: 3,
+            borderColor: colors.isDark ? '#252525' : '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { 
+            legend: { 
+              position: 'bottom',
+              labels: {
+                color: colors.textColor,
+                font: { size: 12, weight: '600' }
+              }
+            },
+            tooltip: {
+              backgroundColor: colors.isDark ? '#333333' : '#ffffff',
+              titleColor: colors.textColor,
+              bodyColor: colors.textColor,
+              borderColor: colors.borderColor,
+              borderWidth: 1
+            }
+          }
+        }
+      });
+    }
+
+    function populateChangesLog(changes) {
+      const tbody = document.getElementById('changesLog');
+      if (changes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No recent changes</td></tr>';
+      } else {
+        tbody.innerHTML = changes.map(change => {
+          // Format date to show only date and time
+          const dateObj = new Date(change.CHANGE_TIME);
+          const formattedDate = dateObj.toLocaleString('en-US', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+          });
+          return `
+            <tr>
+              <td>${change.TABLE_NAME}</td>
+              <td>${change.CLIENT_NAME}</td>
+              <td>${change.FIELD_NAME}</td>
+              <td>${change.OLD_VALUE || '-'}</td>
+              <td>${change.NEW_VALUE || '-'}</td>
+              <td>${change.CHANGED_BY}</td>
+              <td>${formattedDate}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    // Load charts on page load
+    window.addEventListener('load', loadCharts);
+  </script>
+</body>
+</html>

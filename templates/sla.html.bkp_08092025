@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SLA Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<!--<div style="background-color:#1a1a1a; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+  <img src="{{ url_for('static', filename='avanza-logo.png') }}" height="40">
+  <div style="color:#fff;">
+    Logged in as: {{ session['username'] }} |
+    <a href="{{ url_for('dashboard') }}" style="color:#ccc; margin-right:10px;">Dashboard</a> |
+    <a href="{{ url_for('licenses') }}" style="color:#ccc; margin-right:10px;">Licenses</a> |
+    <a href="{{ url_for('sla_page') }}" style="color:#ccc; margin-right:10px;">SLA</a> |
+    <a href="{{ url_for('logout') }}" style="color:#ccc;">Logout</a>
+  </div>
+</div> --!>
+
+<style>
+  h1,h4, h5,  label {
+    color: #4B0082; /* same purple as SLA Dashboard */
+    font-weight: bold;
+  }
+  .table {
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .table thead {
+    background-color: #4B0082;
+    color: #fff;
+  }
+  .table tbody tr:nth-child(even) {
+    background-color: #FAFAFA;
+  }
+  .form-select, .form-control {
+    background-color: #EDE7F6;
+    border: 1px solid #ccc;
+    color: #4B0082;
+    font-weight: bold;
+  }
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h1 class="mt-4" style="color:#4B0082;">Bank SLA Data</h1>
+
+  <!-- Filters row -->
+  <div class="row mb-3">
+    <div class="col-md-4">
+      <label class="form-label">Bank</label>
+      <select id="slaBankFilter" class="form-select">
+        <option value="">All</option>
+        {% for b in banks %}
+          <option value="{{ b }}" {% if b == selected_bank %}selected{% endif %}>{{ b }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Currency</label>
+      <select id="slaCurrencyFilter" class="form-select">
+        <option value="">All</option>
+        {% for c in currencies %}
+          <option value="{{ c }}" {% if c == selected_currency %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Year</label>
+      <select id="slaYearFilter" class="form-select">
+        <option value="">All</option>
+        {% for y in years %}
+          <option value="{{ y }}" {% if y|string == (selected_year|string) %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <!-- bank logo shown when a single bank is selected -->
+  <div class="text-center mb-3">
+    {% if selected_bank %}
+      <img src="{{ url_for('static', filename='logos/' + (selected_bank|replace(' ','_')|replace('(','')|replace(')','')) + '.png') }}" height="60" alt="{{ selected_bank }}">
+    {% endif %}
+  </div>
+
+  <!-- Add SLA form (admin only) -->
+  {% if role == "admin" %}
+  <h5 class="mt-4" style="color:#4B0082;">➕ Add SLA Record</h5>
+  <form id="addSlaForm" class="row g-3" method="post" action="{{ url_for('add_sla') }}">
+    <div class="col-md-3">
+      <label class="form-label">Bank Name</label>
+      <select class="form-select" name="BANK_NAME" required>
+        {% for b in banks %}
+          <option value="{{ b }}">{{ b }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Currency</label>
+      <select class="form-select" name="CURRENCY_MODE" required>
+        {% for c in currencies %}
+          <option value="{{ c }}">{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Year</label>
+      <select class="form-select" name="SLA_YEAR" required>
+        {% for y in years %}
+          <option value="{{ y }}">{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Current Cost</label>
+      <input type="number" class="form-control" name="CURRENT_YEAR_COST" step="0.01" required>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Last Cost</label>
+      <input type="number" class="form-control" name="LAST_YEAR_COST" step="0.01" required>
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">Additional Items Cost</label>
+      <input type="number" class="form-control" name="ADDITIONAL_ITEMS_COST" step="0.01" value="0">
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary" style="background-color:#4B0082;border:none;">Add SLA</button>
+    </div>
+  </form>
+  {% endif %}
+
+  <!-- SLA table -->
+  <table class="table table-bordered mt-4">
+    <thead class="table-dark">
+      <tr>
+        <th>Bank Name</th>
+        <th>Currency</th>
+        <th>Year</th>
+        <th class="text-end">Current Year Cost</th>
+        <th class="text-end">Last Year Cost</th>
+        <th class="text-end">Additional Items Cost</th>
+        <th class="text-end">Increment</th>
+        <th class="text-end">Increment With Addition</th>
+        <th class="text-end">Increment % (Excl. Additional)</th>
+        <th class="text-end">Increment % (Incl. Additional)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sla %}
+	  
+      <tr data-id="{{ s.ID }}">
+        <!-- single cell contains logo + bank name -->
+        <td style="white-space:nowrap;">
+          {% if s.LOGO_FILENAME %}
+            <img src="{{ url_for('static', filename='logos/' + s.LOGO_FILENAME) }}" alt="{{ s.BANK_NAME }}" height="30" style="margin-right:8px;">
+          {% endif %}
+          {{ s.BANK_NAME }}
+        </td>
+        <td>{{ s.CURRENCY_MODE }}</td>
+        <td>{{ s.SLA_YEAR }}</td>
+
+	<!-- Editable fields for admin -->
+		
+		<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}" 
+			data-field="CURRENT_YEAR_COST">{{ "{:,.0f}".format(s.CURRENT_YEAR_COST|float) }}</td>
+		
+		<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}" 
+			data-field="LAST_YEAR_COST">{{ "{:,.0f}".format(s.LAST_YEAR_COST|float) }}</td>
+		
+		<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}" 
+			data-field="ADDITIONAL_ITEMS_COST">{{ "{:,.0f}".format(s.ADDITIONAL_ITEMS_COST|float) }}</td>
+		
+		<!-- Non-editable fields -->
+		<td class="text-end">{{ "{:,.0f}".format(s.SLA_INCREMENT|float) }}</td>
+		<td class="text-end">{{ "{:,.0f}".format(s.SLA_INCREMENT_WITH_ADDITION|float) }}</td>
+		<td class="text-end">
+			{% if s.INCREMENT_PER is not none %}{{ "{:.2f}".format(s.INCREMENT_PER|float) }}%{% else %}-{% endif %}
+		</td>
+		<td class="text-end">
+			{% if s.INCREMENT_PER_WITH_ADDITION is not none %}{{ "{:.2f}".format(s.INCREMENT_PER_WITH_ADDITION|float) }}%{% else %}-{% endif %}
+		</td>
+	</tr>
+	{% endfor %}
+	</tbody>
+  </table>
+
+<h5 class="mt-4">📊 SLA Increment % Comparison</h5>
+<canvas id="slaIncrementChart"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+function loadSlaIncrementChart(data){
+  const ctx = document.getElementById("slaIncrementChart").getContext("2d");
+
+  // destroy old chart instance if reloading
+  if (window.slaChartInstance) {
+    window.slaChartInstance.destroy();
+  }
+
+  window.slaChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.map(r => r.BANK_NAME + " (" + r.CURRENCY_MODE + ") " + r.SLA_YEAR), // ✅ Bank + Year	
+      datasets: [
+        {
+          label: "Increment % (Excl. Additional)",
+          data: data.map(r => r.INCREMENT_PER),
+          backgroundColor: "rgba(54, 162, 235, 0.7)"
+        },
+        {
+          label: "Increment % (Incl. Additional)",
+          data: data.map(r => r.INCREMENT_PER_WITH_ADDITION),
+          backgroundColor: "rgba(255, 99, 132, 0.7)"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+		x: { 
+          title: { display: true, text: "Bank / Year" },  // ✅ clearer axis
+          ticks: {
+            autoSkip: false,    // ✅ show all labels
+            maxRotation: 45,    // ✅ tilt if long
+            minRotation: 30
+          }
+        },
+        y: { 
+          title: { display: true, text: "Increment %" },
+          ticks: {
+            callback: function(value) { return value + "%"; }
+          }
+        }
+      }
+    }
+  });
+}
+
+loadSlaIncrementChart({{ sla|tojson }});
+</script>
+
+<h4 class="mt-4">💰 Year-wise Totals by Currency</h4>
+<table class="table table-bordered">
+  <thead class="table-dark">
+    <tr>
+      <th>Currency</th>
+      <th>Year</th>
+      <th>Current Year Cost</th>
+      <th>Last Year Cost</th>
+      <th>Additional Items Cost</th>
+      <th>Increment</th>
+      <th>Increment With Addition</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in currency_totals %}
+    <tr>
+      <td>{{ row.CURRENCY_MODE }}</td>
+      <td>{{ row.SLA_YEAR }}</td>
+      <td>{{ "{:,.0f}".format(row.CURRENT_YEAR_COST or 0) }}</td>
+      <td>{{ "{:,.0f}".format(row.LAST_YEAR_COST or 0) }}</td>
+      <td>{{ "{:,.0f}".format(row.ADDITIONAL_ITEMS_COST or 0) }}</td>
+      <td>{{ "{:,.0f}".format(row.SLA_INCREMENT or 0) }}</td>
+      <td>{{ "{:,.0f}".format(row.SLA_INCREMENT_WITH_ADDITION or 0) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+</div>
+
+<script>
+function loadIncrementChart(data) {
+  const ctx = document.getElementById("incrementChart").getContext("2d");
+
+  const years = [...new Set(data.map(r => r.SLA_YEAR))].sort();
+
+  const excl = years.map(y => {
+    const rec = data.find(r => r.SLA_YEAR == y);
+    return rec ? rec.INCREMENT_PER : 0;
+  });
+
+  const incl = years.map(y => {
+    const rec = data.find(r => r.SLA_YEAR == y);
+    return rec ? rec.INCREMENT_PER_WITH_ADDITION : 0;
+  });
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [
+        {
+          label: "Increment % (Excl. Additional)",
+          data: excl,
+          borderColor: "rgba(54, 162, 235, 1)",
+          backgroundColor: "rgba(54, 162, 235, 0.2)",
+          tension: 0.2
+        },
+        {
+          label: "Increment % (Incl. Additional)",
+          data: incl,
+          borderColor: "rgba(255, 99, 132, 1)",
+          backgroundColor: "rgba(255, 99, 132, 0.2)",
+          tension: 0.2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(2) + "%";
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: "% Increment" },
+          ticks: { callback: v => v + "%" }
+        }
+      }
+    }
+  });
+}
+
+// 🔄 Call when page loads with full SLA data
+loadIncrementChart({{ sla|tojson }});
+</script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // simple filter handler -> rebuild querystring
+  function buildAndGo() {
+    const bank = document.getElementById('slaBankFilter').value;
+    const currency = document.getElementById('slaCurrencyFilter').value;
+    const year = document.getElementById('slaYearFilter').value;
+    let params = new URLSearchParams();
+    if (bank) params.set('bank', bank);
+    if (currency) params.set('currency', currency);
+    if (year) params.set('year', year);
+    const q = params.toString();
+    window.location = '/sla' + (q ? ('?' + q) : '');
+  }
+
+  document.getElementById('slaBankFilter').addEventListener('change', buildAndGo);
+  document.getElementById('slaCurrencyFilter').addEventListener('change', buildAndGo);
+  document.getElementById('slaYearFilter').addEventListener('change', buildAndGo);
+
+  // Chart placeholder — you can prepare JSON data server-side and inject for real graphing.
+  // (left minimal; optional enhancement later)
+  (function(){
+    const ctx = document.getElementById('slaChart').getContext('2d');
+    new Chart(ctx, { type:'bar', data:{ labels:[], datasets:[]}, options:{} });
+  })();
+</script>
+
+<script>
+document.querySelectorAll("td[contenteditable='true']").forEach(td => {
+  td.addEventListener("blur", function() {
+    const row = td.closest("tr");
+    const id = row.getAttribute("data-id");
+    const field = td.getAttribute("data-field");
+    let value = td.innerText.trim();
+
+    // remove commas for numbers
+    if (["CURRENT_YEAR_COST","LAST_YEAR_COST","ADDITIONAL_ITEMS_COST"].includes(field)) {
+      value = value.replace(/,/g, "");
+    }
+
+    fetch("/update_sla/" + id, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field, value })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        // reload page or update row with recalculated values
+        location.reload();
+      } else {
+        alert("Update failed: " + res.error);
+      }
+    });
+  });
+});
+</script>
+
+
+{% endblock %}
+
+
+</body>
+</html>

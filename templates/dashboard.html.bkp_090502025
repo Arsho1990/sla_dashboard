@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SLA Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+ body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+    h1, h2, h3 {
+      color: #4B0082;
+      margin-top: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background-color: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #ddd;
+    }
+    th {
+      background-color: #4B0082;
+      color: white;
+    }
+    tr:nth-child(even) {
+      background-color: #FAFAFA;
+    }
+    .file-actions button {
+      margin: 4px;
+      padding: 5px 10px;
+      font-size: 12px;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .download-btn {
+      background-color: #FF00FF;
+      color: white;
+    }
+    .delete-btn {
+      background-color: #D32F2F;
+      color: white;
+    }
+    .upload-btn {
+      background-color: #512DA8;
+      color: white;
+    }
+    select {
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+	  background-color: #EDE7F6;
+      color: #4B0082;
+      font-weight: bold;
+    }
+    label {
+		font-weight: bold;
+		color: #4B0082;
+    }
+    .currency-summary h3 {
+      color: #4B0082;
+      margin-top: 30px;
+    }
+      .currency-table {
+      width: 50%;
+      margin-top: 30px;
+      border: 1px solid #ccc;
+      border-collapse: collapse;
+      background-color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .currency-table th, .currency-table td {
+      border: 1px solid #ddd;
+      padding: 8px 12px;
+      text-align: center;
+    }
+    .currency-table th {
+      background-color: #4B0082;
+      color: white;
+    }
+    .currency-pkr {
+      background-color: #E1BEE7;
+      color: #4A148C;
+      font-weight: bold;
+    }
+    .currency-usd {
+      background-color: #D1C4E9;
+      color: #283593;
+      font-weight: bold;
+    }
+    a {
+      color: #FF00FF;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>SLA Dashboard</h1>
+<div style="background-color: #1a1a1a; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between;">
+  <img src="{{ url_for('static', filename='avanza-logo.png') }}" alt="Avanza Logo" style="height: 40px;">
+  <div style="color: #fff;">
+    Logged in as: {{ session['username'] }} |
+	<span>🟢 Login: {{ login_time.strftime('%d-%b-%Y %I:%M:%S %p') if login_time else '-' }}</span> |
+	<span>🔴 Last Logout: {{ logout_time.strftime('%d-%b-%Y %I:%M:%S %p') if logout_time else '-' }}</span> |
+  
+		<a href="/register" style="color: #ccc; margin-right: 10px;">Register User</a> |
+		<a href="{{ url_for('licenses') }}" style="color: #ccc; margin-right: 10px;">Licenses</a> |
+   
+    <a href="/logout" style="color: #ccc;">Logout</a>
+  </div>
+</div>
+<!-- 🕒 Session Timer -->
+<div style="padding: 10px; background-color: #e8eaf6; color: #4B0082; font-weight: bold;">
+  ⏱️ Session Time: <span id="session-timer">00:00:00</span>
+</div>
+  <!-- 🔽 Dropdown Filter -->
+<div style="margin: 20px 0;">
+    <form method="GET" action="/">
+      <label for="bank">Filter by Bank:</label>
+      <select name="bank" id="bank" onchange="this.form.submit()">
+        <option value="">All Banks</option>
+        {% for bank in all_banks %}
+          <option value="{{ bank }}" {% if bank == selected_bank %}selected{% endif %}>{{ bank }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>	
+  <table>
+    <tr>
+      <th>Bank Name</th>
+      <th>Period</th>
+      <th>SLA 2023</th>
+      <th>SLA 2024</th>
+      <th>SLA 2025</th>
+	  <th>Difference</th>
+      <th>% Increase</th>
+      <th>Status</th>
+      <th>Upload Date</th>
+      <th>Modified Date</th>
+      <th>Document</th>
+      <th>Actions</th>
+    </tr>
+    {% for row in data %}
+    <tr>
+    <td>{{ row['BANK_NAME'] }}</td>
+    <td contenteditable="{{ 'true' if role == 'admin' else 'false' }}"
+    onblur="updateField(this, '{{ row['BANK_NAME'] }}', '{{ row['PERIOD'] }}', 'PERIOD')">
+    {{ row['PERIOD'] }}
+</td>
+
+<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}"
+    onblur="updateField(this, '{{ row['BANK_NAME'] }}', '{{ row['PERIOD'] }}', 'YEAR_2023')">
+    {{ "{:,}".format(row['YEAR_2023']|float|round(0)) }}
+</td>
+
+<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}"
+    onblur="updateField(this, '{{ row['BANK_NAME'] }}', '{{ row['PERIOD'] }}', 'YEAR_2024')">
+    {{ "{:,}".format(row['YEAR_2024']|float|round(0)) }}
+</td>
+
+<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}"
+    onblur="updateField(this, '{{ row['BANK_NAME'] }}', '{{ row['PERIOD'] }}', 'YEAR_2025')">
+    {{ "{:,}".format(row['YEAR_2025']|float|round(0)) }}
+</td>
+	<td>{{ "{:,.0f}".format(row['DIFF']) if row['DIFF'] is not none else "-" }}</td>
+    <td>
+  {% if row['PCT_INC'] is defined and row['PCT_INC'] is not none %}
+  {{ "{:.2f}".format(row['PCT_INC']) }}%
+{% else %}
+  0.00%
+{% endif %}
+</td>
+    <td contenteditable="{{ 'true' if role == 'admin' else 'false' }}"
+    onblur="updateField(this, '{{ row['BANK_NAME'] }}', '{{ row['PERIOD'] }}', 'STATUS')">
+    {{ row['STATUS'] or '' }}
+</td>
+    <td>{{ row['UPLOAD_DATE'] or '' }}</td>
+    <td>{{ row['MODIFIED_DATE'] or '' }}</td>
+    <td>
+        {% if row.SLA_DOC_FILENAME %}
+          {{ row.SLA_DOC_FILENAME }}
+        {% else %}
+          No file
+        {% endif %}
+      </td>
+      <td class="file-actions">
+        {% if row.SLA_DOC_FILENAME %}
+          <a class="download-btn" href="/download?bank={{ row['BANK_NAME'] }}&period={{ row['PERIOD'] }}">Download</a>
+          <form method="POST" action="/delete" style="display:inline;">
+            <input type="hidden" name="bank" value="{{ row['BANK_NAME'] }}">
+            <input type="hidden" name="period" value="{{ row['PERIOD'] }}">
+            <button class="delete-btn" type="submit">Delete</button>
+          </form>
+        {% endif %}
+        <form method="POST" action="/upload" enctype="multipart/form-data">
+          <input type="hidden" name="bank" value="{{ row['BANK_NAME'] }}">
+          <input type="hidden" name="period" value="{{ row['PERIOD'] }}">
+          <input type="file" name="file" accept=".pdf,.doc,.docx" required>
+          <button class="upload-btn" type="submit">Upload</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+   <!-- 📊 Chart for 2023, 2024, 2025 -->
+  <h2 style="margin-top: 40px;">SLA Comparison (2023 vs 2024 vs 2025)</h2>
+  <canvas id="slaChart" width="800" height="400"></canvas>
+  
+  <!-- 💰 Total SLA per Currency -->
+    <div class="currency-summary">
+    <h3>💰 Total SLA Amount by Currency</h3>
+    <table class="currency-table">
+      <thead>
+        <tr>
+          <th>Currency</th>
+          <th>2023</th>
+          <th>2024</th>
+          <th>2025</th>
+        </tr>
+      </thead>
+      <tbody>
+  {% for row in currency_totals %}
+      <tr class="currency-{{ row.SLA_CURRENCY|lower }}">
+<td>
+  {% if row.SLA_CURRENCY == 'PKR' %}
+    <span class="currency-pkr">🇵🇰 PKR</span>
+  {% elif row.SLA_CURRENCY == 'USD' %}
+    <span class="currency-usd">🇺🇸 USD</span>
+  {% else %}
+    <span>{{ row.SLA_CURRENCY }}</span>
+  {% endif %}
+</td>
+        <td>{{ "{:,}".format(row.YEAR_2023|float|round(0)) }}</td>
+        <td>{{ "{:,}".format(row.YEAR_2024|float|round(0)) }}</td>
+        <td>{{ "{:,}".format(row.YEAR_2025|float|round(0)) }}</td>
+      </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+  const banks = {{ banks|tojson }};
+  const y2023 = {{ y2023|tojson }};
+  const y2024 = {{ y2024|tojson }};
+  const y2025 = {{ y2025|tojson }};
+  const percent_23_to_24 = {{ percent_23_to_24|tojson }};
+  const percent_24_to_25 = {{ percent_24_to_25|tojson }};
+
+
+  const ctx = document.getElementById('slaChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: banks,
+      datasets: [
+        {
+            label: '2023',
+			data: y2023,
+			backgroundColor: 'rgba(54, 162, 235, 0.6)',
+			borderColor: 'rgba(54, 162, 235, 1)',
+			borderWidth: 1
+        },
+        {
+            label: '2024',
+			data: y2024,
+			backgroundColor: 'rgba(255, 206, 86, 0.6)',
+			borderColor: 'rgba(255, 206, 86, 1)',
+			borderWidth: 1
+        },
+        {
+			label: '2025',
+			data: y2025,
+			backgroundColor: 'rgba(75, 192, 192, 0.6)',
+			borderColor: 'rgba(75, 192, 192, 1)',
+			borderWidth: 1
+        },
+        {
+          type: 'line',
+          label: '% Inc (2023→2024)',
+          data: percent_23_to_24,
+          borderColor: 'rgba(255, 99, 132, 1)',
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          yAxisID: 'percentage'
+        },
+        {
+          type: 'line',
+          label: '% Inc (2024→2025)',
+          data: percent_24_to_25,
+          borderColor: 'rgba(153, 102, 255, 1)',
+          backgroundColor: 'rgba(153, 102, 255, 0.2)',
+          yAxisID: 'percentage'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      stacked: false,
+      scales: {
+        y: {
+            beginAtZero: true,
+            suggestedMax: Math.max(...y2023, ...y2024, ...y2025) * 1.2,
+            title: { display: true, text: 'SLA Value' },
+            ticks: {
+              callback: value => value.toLocaleString()
+            }
+          },
+        percentage: {
+            beginAtZero: true,
+            position: 'right',
+            title: { display: true, text: '% Increase' },
+            ticks: { callback: value => value + '%' }
+          }
+        },
+      plugins: {
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const label = context.dataset.label || '';
+                return label.includes('%') ? `${label}: ${context.parsed.y}%` : `${label}: ${context.parsed.y.toLocaleString()}`;
+              }
+            }
+          }
+        }
+      }
+    });
+</script>
+<script>
+function updateField(cell, bank, period, field) {
+    let newValue = cell.innerText.trim();
+
+    // 🔧 Remove commas before sending (for numeric fields)
+    if (["YEAR_2023", "YEAR_2024", "YEAR_2025"].includes(field)) {
+        newValue = newValue.replace(/,/g, '');
+    }
+
+    fetch("/update_field", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bank, period, field, value: newValue })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (!data.success) {
+            alert("Update failed: " + data.message);
+        } else {
+			// Update only "Modified Date" cell (2nd last column)
+			const row = cell.closest("tr");
+			row.querySelector("td:nth-last-child(2)").innerText = data.last_updated;
+		}
+    });
+	let minutes = 0;
+	setInterval(() => {
+	minutes += 1;
+	document.getElementById("sessionTimer").innerText = minutes;
+	}, 60000);
+}
+</script>
+<script>
+  let sessionStart = new Date("{{ session['login_time'] }}");
+
+  function updateSessionTimer() {
+    let now = new Date();
+    let diff = new Date(now - sessionStart);
+
+    let hours = String(diff.getUTCHours()).padStart(2, '0');
+    let minutes = String(diff.getUTCMinutes()).padStart(2, '0');
+    let seconds = String(diff.getUTCSeconds()).padStart(2, '0');
+
+    document.getElementById('session-timer').innerText = `${hours}:${minutes}:${seconds}`;
+  }
+
+  setInterval(updateSessionTimer, 1000);
+</script>
+
+</body>
+</html>

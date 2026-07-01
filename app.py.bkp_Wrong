@@ -1,0 +1,143 @@
+from flask import Flask, render_template, request, redirect, send_file
+import oracledb
+import pandas as pd
+import io
+from datetime import datetime
+
+app = Flask(__name__)
+
+# 🔌 Database connection setup
+def get_connection():
+    return oracledb.connect(
+        user="asnafees", 
+        password="Gryhhhbbn1", 
+        dsn="172.16.0.84:1521/orcl.avanza.pk"
+    )
+
+# 📊 Dashboard route
+@app.route('/')
+def dashboard():
+    conn = get_connection()
+    df = pd.read_sql("SELECT * FROM SLA", conn)
+    conn.close()
+
+    # Prepare data for chart
+    banks = df['BANK_NAME'].tolist()
+    year_2023 = df['YEAR_2023'].tolist() if 'YEAR_2023' in df else [0]*len(banks)
+    year_2024 = df['YEAR_2024'].tolist() if 'YEAR_2024' in df else [0]*len(banks)
+    year_2025 = df['YEAR_2025'].tolist() if 'YEAR_2025' in df else [0]*len(banks)
+
+    return render_template("dashboard.html", 
+                           data=df.to_dict(orient='records'),
+                           banks=banks, 
+                           y2023=year_2023, 
+                           y2024=year_2024, 
+                           y2025=year_2025)
+
+# ⬆️ Upload/Update Route
+@app.route('/update', methods=['POST'])
+def update():
+    conn = get_connection()
+    cursor = conn.cursor()
+    total_rows = int(request.form.get('total_rows', 0))
+
+    for i in range(total_rows):
+        bank = request.form.get(f'BANK_NAME_{i}').strip()
+        period = request.form.get(f'PERIOD_{i}').strip()
+        current_year_sla = request.form.get(f'CURRENT_YEAR_SLA_{i}')
+        modified_date = datetime.now()
+
+        file = request.files.get(f'SLA_DOC_{i}')
+
+        if file and file.filename:
+            file_data = file.read()
+            file_name = file.filename
+            file_type = file.mimetype
+            upload_date = datetime.now()
+
+            cursor.execute("""
+                UPDATE SLA SET YEAR_2025 = :sla,
+                               SLA_DOC = :doc,
+                               SLA_DOC_FILENAME = :filename,
+                               SLA_DOC_TYPE = :filetype,
+                               UPLOAD_DATE = :uploaddt,
+                               MODIFIED_DATE = :modifieddt
+                WHERE BANK_NAME = :bank AND PERIOD = :period
+            """, {
+                'sla': current_year_sla,
+                'doc': file_data,
+                'filename': file_name,
+                'filetype': file_type,
+                'uploaddt': upload_date,
+                'modifieddt': modified_date,
+                'bank': bank,
+                'period': period
+            })
+        else:
+            cursor.execute("""
+                UPDATE SLA SET YEAR_2025 = :sla,
+                               MODIFIED_DATE = :modifieddt
+                WHERE BANK_NAME = :bank AND PERIOD = :period
+            """, {
+                'sla': current_year_sla,
+                'modifieddt': modified_date,
+                'bank': bank,
+                'period': period
+            })
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect('/')
+
+# ⬇️ Download route
+@app.route('/download')
+def download():
+    bank = request.args.get('bank')
+    period = request.args.get('period')
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT SLA_DOC, SLA_DOC_FILENAME, SLA_DOC_TYPE FROM SLA WHERE BANK_NAME = :bank AND PERIOD = :period", {'bank': bank, 'period': period})
+    row = cursor.fetchone()
+    conn.close()
+
+    if row and row[0]:
+        return send_file(io.BytesIO(row[0].read()), download_name=row[1], mimetype=row[2])
+    return "File not found", 404
+
+# ❌ Delete route
+@app.route('/delete', methods=['POST'])
+def delete():
+    bank = request.form.get('bank')
+    period = request.form.get('period')
+    print(f"[DELETE] Received for {bank} - {period}")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            UPDATE SLA SET SLA_DOC = NULL,
+                          SLA_DOC_FILENAME = NULL,
+                          SLA_DOC_TYPE = NULL,
+                          UPLOAD_DATE = NULL,
+                          MODIFIED_DATE = :modifieddt
+            WHERE UPPER(TRIM(BANK_NAME)) = UPPER(TRIM(:bank))
+              AND UPPER(TRIM(PERIOD)) = UPPER(TRIM(:period))
+        """, {
+            'bank': bank,
+            'period': period,
+            'modifieddt': datetime.now()
+        })
+        print(f"[DELETE] Rows affected: {cursor.rowcount}")
+        conn.commit()
+    except Exception as e:
+        print(f"[DELETE ERROR] {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect('/')
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

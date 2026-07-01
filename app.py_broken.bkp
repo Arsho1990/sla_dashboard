@@ -1,0 +1,49 @@
+from flask import Flask, render_template
+import oracledb as cx_Oracle
+import pandas as pd
+
+app = Flask(__name__)
+
+# Oracle DB connection
+def get_connection():
+    return cx_Oracle.connect(
+        user="asnafees",
+        password="Gryhhhbbn1",
+        dsn="172.16.0.84:1521/orcl.avanza.pk"
+    )
+
+# Get SLA dashboard data
+def get_sla_data():
+    conn = get_connection()
+    
+    query = """
+        SELECT 
+            BANK_NAME, PERIOD, 
+            YEAR_2024 AS LAST_YEAR_SLA,
+            YEAR_2025 AS CURRENT_YEAR_SLA,
+            (YEAR_2025 - YEAR_2024) AS DIFF,
+            ROUND((YEAR_2025 - YEAR_2024) / NULLIF(YEAR_2024, 0) * 100, 2) AS PERCENTAGE,
+            STATUS, PERCENTAGE_TARGET, COMMENTS, SYNCED_ON_SVN
+        FROM SLA
+    """
+
+    df = pd.read_sql(query, conn)
+
+    # Convert LOB/CLOB to string
+    if 'COMMENTS' in df.columns:
+        df['COMMENTS'] = df['COMMENTS'].astype(str)
+
+    conn.close()
+
+    df['TARGET'] = df['CURRENT_YEAR_SLA'] * 1.10
+
+    return df.to_dict(orient='records')
+
+# ✅ This must be defined outside of get_sla_data
+@app.route('/')
+def dashboard():
+    data = get_sla_data()
+    return render_template('dashboard.html', data=data)
+
+if __name__ == '__main__':
+    app.run(debug=True)

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SLA Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div style="background-color:#1a1a1a; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+  <img src="{{ url_for('static', filename='avanza-logo.png') }}" height="40">
+  <div style="color:#fff;">
+    Logged in as: {{ session['username'] }} |
+    <a href="{{ url_for('dashboard') }}" style="color:#ccc; margin-right:10px;">Dashboard</a> |
+    <a href="{{ url_for('licenses') }}" style="color:#ccc; margin-right:10px;">Licenses</a> |
+    <a href="{{ url_for('sla_page') }}" style="color:#ccc; margin-right:10px;">SLA</a> |
+    <a href="{{ url_for('logout') }}" style="color:#ccc;">Logout</a>
+  </div>
+</div>
+
+<style>
+  h1,h4, h5,  label {
+    color: #4B0082; /* same purple as SLA Dashboard */
+    font-weight: bold;
+  }
+  .table {
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .table thead {
+    background-color: #4B0082;
+    color: #fff;
+  }
+  .table tbody tr:nth-child(even) {
+    background-color: #FAFAFA;
+  }
+  .form-select, .form-control {
+    background-color: #EDE7F6;
+    border: 1px solid #ccc;
+    color: #4B0082;
+    font-weight: bold;
+  }
+</style>
+
+<div class="container mt-4"> 
+  <!--<h1 class="text-primary">Bank SLA Data</h1> -->
+<h1 class="mt-4">Bank SLA Data</h1>
+  <!-- Filter Section -->
+<div class="row mb-3">
+  <div class="col-md-3">
+    <label>Bank</label>
+    <select id="slaBankFilter" class="form-select">
+      <option value="">All</option>
+      {% for b in banks %}
+        <option value="{{ b }}">{{ b }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <label>Currency</label>
+    <select id="slaCurrencyFilter" class="form-select">
+      <option value="">All</option>
+      {% for c in currencies %}
+        <option value="{{ c }}">{{ c }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <label>Year</label>
+    <select id="slaYearFilter" class="form-select">
+      <option value="">All</option>
+      {% for y in years %}
+        <option value="{{ y }}">{{ y }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
+
+  <!-- Add SLA Form -->
+{% if role == "admin" %}
+<h5 class="mt-4">➕ Add SLA Record</h5>
+<form id="addSlaForm" class="row g-3" method="post" action="/add_sla">
+  <div class="col-md-3">
+    <label>Bank Name</label>
+    <select class="form-select" name="BANK_NAME">
+      {% for b in banks %}
+        <option value="{{ b }}">{{ b }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-2">
+    <label>Currency</label>
+    <select class="form-select" name="CURRENCY_MODE">
+      {% for c in currencies %}
+        <option value="{{ c }}">{{ c }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-2">
+    <label>Year</label>
+    <select class="form-select" name="SLA_YEAR">
+      {% for y in years %}
+        <option value="{{ y }}">{{ y }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+	<div class="col-md-2"><label>Current Cost</label><input type="number" class="form-control" name="CURRENT_YEAR_COST"></div>
+	<div class="col-md-2"><label>Last Cost</label><input type="number" class="form-control" name="LAST_YEAR_COST"></div>
+	<div class="col-md-3"><label>Additional ITems Cost</label><input type="number" class="form-control" name="ADDITION_RFC_ATM_COST"></div>
+	<div class="col-12"><button type="submit" class="btn btn-primary" style="background-color:#4B0082;border:none;">Add SLA</button></div>
+</form>
+{% endif %}
+
+  <!-- SLA Table -->
+  <table class="table table-bordered mt-4">
+    <thead class="table-dark">
+      <tr>
+        <th>Bank</th><th>Currency</th><th>Year</th>
+		<th>Current Year Cost</th><th>Last Year Cost</th>
+		<th>Additional Items Cost</th>
+		<th>Increment</th><th>Increment With Addition</th>
+		<th>Increment % (Excl. Additional)</th>
+		<th>Increment % (Incl. Additional)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sla %}
+    <tr>
+		<td>
+			<img src="{{ url_for('static', filename='logos/' + s.BANK_NAME + '.png') }}"
+				alt="{{ s.BANK_NAME }}" height="30">
+		</td>
+		<td>{{ s.BANK_NAME }}</td>
+		<td>{{ s.CURRENCY_MODE }}</td>
+		<td>{{ s.SLA_YEAR }}</td>
+		<td>{{ "{:,.0f}".format(s.CURRENT_YEAR_COST|float) }}</td>
+		<td>{{ "{:,.0f}".format(s.LAST_YEAR_COST|float) }}</td>
+		<td>{{ "{:,.0f}".format(s.ADDITIONAL_ITEMS_COST|float) }}</td>
+		<td>{{ "{:,.0f}".format(s.SLA_INCREMENT|float) }}</td>
+		<td>{{ "{:,.0f}".format(s.SLA_INCREMENT_WITH_ADDITION|float) }}</td>
+		<td>{{ "{:.2f}".format(s.INCREMENT_PER|float) }}%</td>
+		<td>{{ "{:.2f}".format(s.INCREMENT_PER_WITH_ADDITION|float) }}%</td>
+	</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Chart -->
+  <canvas id="slaChart"></canvas>
+</div>
+
+<script>
+function loadSlaChart(data){
+  const ctx = document.getElementById("slaChart").getContext("2d");
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.map(r => r.YEAR),
+      datasets: [
+        {label: "Current Cost", data: data.map(r => r.CURRENT_YEAR_COST)},
+        {label: "Last Cost", data: data.map(r => r.LAST_YEAR_COST)},
+        {label: "Increment", data: data.map(r => r.SLA_INCREMENT)},
+        {label: "Increment+RFC", data: data.map(r => r.SLA_INCREMENT_WITH_ADDITION)}
+      ]
+    }
+  });
+}
+</script>
+<script>
+document.getElementById("addSlaForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  const formData = new FormData(this);
+  fetch("/add_sla", {
+    method: "POST",
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    console.log("Inserted:", data);
+    location.reload(); // refresh table
+  });
+});
+</script>
+
+</body>
+</html>

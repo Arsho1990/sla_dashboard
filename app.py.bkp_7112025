@@ -1,0 +1,48 @@
+import pandas as pd
+import oracledb as cx_Oracle
+from flask import Flask, render_template
+
+app = Flask(__name__)
+
+def get_connection():
+    return cx_Oracle.connect(
+        user="asnafees",
+        password="Gryhhhbbn1",
+        dsn="172.16.0.84:1521/orcl.avanza.pk"
+    )
+
+@app.route('/')
+def dashboard():
+    conn = get_connection()
+    query = """
+        SELECT 
+            BANK_NAME, PERIOD, 
+            YEAR_2024 AS LAST_YEAR_SLA,
+            YEAR_2025 AS CURRENT_YEAR_SLA,
+            (YEAR_2025 - YEAR_2024) AS DIFF,
+            ROUND((YEAR_2025 - YEAR_2024) / NULLIF(YEAR_2024, 0) * 100, 2) AS PERCENTAGE,
+            STATUS, PERCENTAGE_TARGET, COMMENTS, SYNCED_ON_SVN,
+            SLA_DOC_FILENAME
+        FROM SLA
+    """
+    df = pd.read_sql(query, conn)
+    conn.close()
+
+    df['CURRENT_YEAR_SLA'] = pd.to_numeric(df['CURRENT_YEAR_SLA'], errors='coerce').fillna(0)
+    df['FUTURE_10'] = df['CURRENT_YEAR_SLA'] * 1.10
+    df['FUTURE_11'] = df['CURRENT_YEAR_SLA'] * 1.11
+    df['FUTURE_12'] = df['CURRENT_YEAR_SLA'] * 1.12
+    df['FUTURE_13'] = df['CURRENT_YEAR_SLA'] * 1.13
+    df['FUTURE_14'] = df['CURRENT_YEAR_SLA'] * 1.14
+    df['FUTURE_15'] = df['CURRENT_YEAR_SLA'] * 1.15
+    df['FUTURE_18'] = df['CURRENT_YEAR_SLA'] * 1.18
+    df['FUTURE_20'] = df['CURRENT_YEAR_SLA'] * 1.20
+
+    return render_template("dashboard.html", 
+        data=df.to_dict(orient='records'),
+        banks=df['BANK_NAME'].tolist(),
+        diff=df['DIFF'].tolist(),
+        target=df['PERCENTAGE_TARGET'].tolist())
+
+if __name__ == '__main__':
+    app.run(debug=True)

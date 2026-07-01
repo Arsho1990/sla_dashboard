@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - SLA Dashboard</title>
+  <style>
+    /* CSS Variables for Theming */
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f5f5f5;
+      --bg-tertiary: #efefef;
+      --text-primary: #1a1a1a;
+      --text-secondary: #666666;
+      --border-color: #e0e0e0;
+      --header-bg: #1a1a1a;
+      --header-text: #ffffff;
+      --accent-color: #4B0082;
+      --accent-light: #EDE7F6;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      --success-color: #4CAF50;
+      --warning-color: #FF9800;
+      --danger-color: #D32F2F;
+    }
+
+    /* Dark Mode */
+    html.dark-mode {
+      --bg-primary: #1e1e1e;
+      --bg-secondary: #2d2d2d;
+      --bg-tertiary: #3a3a3a;
+      --text-primary: #f0f0f0;
+      --text-secondary: #b0b0b0;
+      --border-color: #444444;
+      --header-bg: #0d0d0d;
+      --header-text: #ffffff;
+      --accent-light: #3d2d5c;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Global Styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      transition: all 0.3s ease;
+      line-height: 1.6;
+    }
+
+    /* Header Styles */
+    .header {
+      background-color: var(--header-bg);
+      color: var(--header-text);
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .logo {
+      height: 40px;
+      max-width: 150px;
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #BB86FC;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid #555;
+      color: #B0B0B0;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 18px;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+    }
+
+    .theme-toggle:hover {
+      background-color: rgba(187, 134, 252, 0.1);
+      color: #BB86FC;
+      border-color: #BB86FC;
+    }
+
+    /* Login Container */
+    .login-wrapper {
+      min-height: calc(100vh - 70px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 30px 20px;
+      background-color: var(--bg-secondary);
+    }
+
+    .login-container {
+      background-color: var(--bg-primary);
+      padding: 50px 40px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      border-left: 6px solid var(--accent-color);
+      width: 100%;
+      max-width: 450px;
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .login-header img {
+      height: 50px;
+      margin-bottom: 15px;
+    }
+
+    .login-header h2 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent-color);
+      margin-bottom: 10px;
+    }
+
+    .login-header p {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* Form Group */
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid var(--border-color);
+      border-radius: 6px;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+
+    .form-group input::placeholder {
+      color: var(--text-secondary);
+    }
+
+    /* Buttons */
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 15px;
+    }
+
+    .login-btn:hover {
+      background-color: #6A0C9F;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(75, 0, 130, 0.3);
+    }
+
+    /* Messages */
+    .error-message {
+      background-color: #ffebee;
+      color: #c62828;
+      padding: 12px 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-weight: 600;
+      border-left: 4px solid #d32f2f;
+    }
+
+    .success-message {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      padding: 12px 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-weight: 600;
+      border-left: 4px solid #4caf50;
+    }
+
+    /* Links */
+    .forgot-link {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .forgot-link a {
+      color: var(--accent-color);
+      text-decoration: none;
+      font-size: 13px;
+      transition: all 0.3s ease;
+    }
+
+    .forgot-link a:hover {
+      text-decoration: underline;
+      color: #6A0C9F;
+    }
+
+    /* Responsive Styles */
+    @media (max-width: 1024px) {
+      .header {
+        flex-direction: column;
+        padding: 12px 20px;
+        gap: 12px;
+      }
+      
+      .logo {
+        height: 35px;
+      }
+      
+      .header-title {
+        font-size: 20px;
+      }
+      
+      .login-container {
+        max-width: 90%;
+        padding: 40px 30px;
+      }
+    }
+    
+    /* Tablets and smaller */
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        padding: 10px 15px;
+        gap: 10px;
+      }
+      
+      .header-left {
+        gap: 10px;
+      }
+      
+      .logo {
+        height: 28px;
+        max-width: 100px;
+      }
+      
+      .header-title {
+        font-size: 16px;
+      }
+      
+      .header-right {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .login-wrapper {
+        min-height: calc(100vh - 60px);
+        padding: 20px 15px;
+      }
+      
+      .login-container {
+        padding: 30px 20px;
+        max-width: 100%;
+        width: 100%;
+        border-left-width: 4px;
+      }
+      
+      .login-header {
+        margin-bottom: 30px;
+      }
+      
+      .login-header img {
+        height: 35px;
+        margin-bottom: 10px;
+      }
+      
+      .login-header h2 {
+        font-size: 22px;
+      }
+      
+      .login-header p {
+        font-size: 12px;
+      }
+      
+      .form-group {
+        margin-bottom: 18px;
+      }
+      
+      .form-group label {
+        font-size: 12px;
+      }
+      
+      .form-group input {
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+      
+      .login-btn {
+        padding: 12px;
+        font-size: 14px;
+      }
+      
+      .forgot-link a {
+        font-size: 12px;
+      }
+    }
+    
+    /* Small mobile: 480px and below */
+    @media (max-width: 480px) {
+      .header {
+        padding: 8px 10px;
+      }
+      
+      .logo {
+        height: 24px;
+        max-width: 80px;
+      }
+      
+      .header-title {
+        font-size: 14px;
+      }
+      
+      .login-wrapper {
+        min-height: calc(100vh - 50px);
+        padding: 15px 10px;
+      }
+      
+      .login-container {
+        padding: 20px 15px;
+        border-left-width: 3px;
+      }
+      
+      .login-header {
+        margin-bottom: 25px;
+      }
+      
+      .login-header img {
+        height: 30px;
+      }
+      
+      .login-header h2 {
+        font-size: 18px;
+      }
+      
+      .login-header p {
+        font-size: 11px;
+      }
+      
+      .form-group {
+        margin-bottom: 15px;
+      }
+      
+      .form-group label {
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+      
+      .form-group input {
+        padding: 8px 10px;
+        font-size: 12px;
+        border-radius: 4px;
+      }
+      
+      .login-btn {
+        padding: 10px;
+        font-size: 12px;
+        margin-top: 10px;
+      }
+      
+      .forgot-link {
+        margin-top: 15px;
+      }
+      
+      .forgot-link a {
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <img src="{{ url_for('static', filename='avanza-logo.png') }}" alt="Logo" class="logo">
+      <div class="header-title">SLA Dashboard</div>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌙</button>
+    </div>
+  </div>
+
+  <!-- Login Form -->
+  <div class="login-wrapper">
+    <div class="login-container">
+      <div class="login-header">
+        <img src="{{ url_for('static', filename='avanza-logo.png') }}" alt="Avanza Logo">
+        <h2>Login</h2>
+        <p>to SLA Dashboard</p>
+      </div>
+
+      {% if error %}
+        <div class="error-message">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('login') }}">
+        <div class="form-group">
+          <label for="username">👤 Username</label>
+          <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="password">🔐 Password</label>
+          <input type="password" id="password" name="password" placeholder="Enter your password" required>
+        </div>
+
+        <button type="submit" class="login-btn">🔓 Login</button>
+      </form>
+
+      <div class="forgot-link">
+        <a href="{{ url_for('forgot_password') }}">🔑 Forgot Password?</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDarkMode = html.classList.toggle('dark-mode');
+      localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+      updateThemeIcon();
+    }
+
+    function updateThemeIcon() {
+      const btn = document.querySelector('.theme-toggle');
+      const isDark = document.documentElement.classList.contains('dark-mode');
+      btn.textContent = isDark ? '☀️' : '🌙';
+    }
+
+    // Load saved theme
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark-mode');
+      }
+      updateThemeIcon();
+    });
+  </script>
+</body>
+</html>

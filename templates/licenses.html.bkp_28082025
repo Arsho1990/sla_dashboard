@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Licenses</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body { background: #f8f9fa; }
+    .navbar { background: #002b49; }
+    .navbar-brand, .nav-link, .navbar-text { color: #fff !important; }
+    table { font-size: 0.9rem; }
+    td[contenteditable="true"] { background: #fff8dc; cursor: text; }
+    td[contenteditable="false"] { background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark px-3">
+    <a class="navbar-brand" href="/">SLA Dashboard</a>
+    <div class="ms-auto">
+      <span class="navbar-text me-3">Logged in as: {{ session['username'] }}</span>
+      <a class="btn btn-sm btn-outline-light" href="/logout">Logout</a>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+
+    <!-- Client Filter -->
+    <form id="filterForm" method="get" action="/licenses" class="row mb-3">
+      <div class="col-md-4">
+        <select class="form-select" name="client" onchange="$('#filterForm').submit()">
+          <option value="">-- All Clients --</option>
+          {% for c in clients %}
+            <option value="{{c}}" {% if selected_client == c %}selected{% endif %}>{{c}}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+
+    <!-- RDV License Form -->
+    <div class="card mb-4">
+      <div class="card-header bg-dark text-white">Add RDV License</div>
+      <div class="card-body">
+        <form id="rdvForm" class="row g-2">
+          <input type="hidden" name="form_type" value="rdv">
+          <div class="col"><input type="text" class="form-control" name="CLIENT_NAME" placeholder="Client"></div>
+          <div class="col"><input type="text" class="form-control" name="LICENSE_GUID" placeholder="License GUID"></div>
+          <div class="col"><input type="number" class="form-control" name="MAXNETWORKS" placeholder="Max Networks"></div>
+          <div class="col"><input type="number" class="form-control" name="MAXADAPTERS" placeholder="Max Adapters"></div>
+          <div class="col"><input type="number" class="form-control" name="MT" placeholder="MT"></div>
+          <div class="col"><input type="number" class="form-control" name="TP" placeholder="TP"></div>
+          <div class="col"><input type="number" class="form-control" name="TCPIP" placeholder="TCPIP"></div>
+          <div class="col"><input type="number" class="form-control" name="SYBASE" placeholder="Sybase"></div>
+          <div class="col"><input type="number" class="form-control" name="WEBSERVICE" placeholder="WebService"></div>
+          <div class="col"><input type="number" class="form-control" name="MSMQ" placeholder="MSMQ"></div>
+          <div class="col"><input type="number" class="form-control" name="MQSERIES" placeholder="MQSeries"></div>
+          <div class="col"><input type="text" class="form-control" name="STATUS" placeholder="Status"></div>
+          <div class="col"><button type="submit" class="btn btn-primary">Add</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Nimbus License Form -->
+    <div class="card mb-4">
+      <div class="card-header bg-dark text-white">Add Nimbus License</div>
+      <div class="card-body">
+        <form id="nimbusForm" class="row g-2">
+          <input type="hidden" name="form_type" value="nimbus">
+          <div class="col"><input type="text" class="form-control" name="CLIENT_NAME" placeholder="Client"></div>
+          <div class="col"><input type="text" class="form-control" name="LICENSE_GUID" placeholder="License GUID"></div>
+          <div class="col"><input type="number" class="form-control" name="MAXTERMINALS" placeholder="Max Terminals"></div>
+          <div class="col"><button type="submit" class="btn btn-primary">Add</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- RDV Table -->
+    <div class="card mb-4">
+      <div class="card-header bg-secondary text-white">RDV Licenses</div>
+      <div class="card-body table-responsive">
+        <table class="table table-bordered table-striped" id="rdvTable">
+          <thead class="table-dark">
+            <tr>
+              <th>Client</th><th>License GUID</th><th>MaxNetworks</th><th>MaxAdapters</th>
+              <th>MT</th><th>TP</th><th>TCPIP</th><th>Sybase</th><th>WebService</th>
+              <th>MSMQ</th><th>MQSeries</th><th>Status</th><th>Last Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rdv %}
+            <tr data-id="{{row[0]}}">
+              <td data-field="CLIENT_NAME" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[1]}}</td>
+              <td data-field="LICENSE_GUID" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[2]}}</td>
+              <td data-field="MAXNETWORKS" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[3]}}</td>
+              <td data-field="MAXADAPTERS" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[4]}}</td>
+              <td data-field="MT" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[5]}}</td>
+              <td data-field="TP" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[6]}}</td>
+              <td data-field="TCPIP" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[7]}}</td>
+              <td data-field="SYBASE" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[8]}}</td>
+              <td data-field="WEBSERVICE" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[9]}}</td>
+              <td data-field="MSMQ" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[10]}}</td>
+              <td data-field="MQSERIES" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[11]}}</td>
+              <td data-field="STATUS" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[12]}}</td>
+              <td class="last-updated">{{row[13]}}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Nimbus Table -->
+    <div class="card mb-4">
+      <div class="card-header bg-secondary text-white">Nimbus Licenses</div>
+      <div class="card-body table-responsive">
+        <table class="table table-bordered table-striped" id="nimbusTable">
+          <thead class="table-dark">
+            <tr>
+              <th>Client</th><th>License GUID</th><th>MaxTerminals</th><th>Last Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in nimbus %}
+            <tr data-id="{{row[0]}}">
+              <td data-field="CLIENT_NAME" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[1]}}</td>
+              <td data-field="LICENSE_GUID" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[2]}}</td>
+              <td data-field="MAXTERMINALS" contenteditable="{{ 'true' if role=='admin' else 'false' }}">{{row[3]}}</td>
+              <td class="last-updated">{{row[4]}}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+$(function(){
+
+  // --- Add RDV License ---
+  $("#rdvForm").submit(function(e){
+    e.preventDefault();
+    let data = {};
+    $(this).serializeArray().forEach(x => data[x.name] = x.value);
+
+    $.ajax({
+      url:"/add_rdv_license",
+      type:"POST",
+      contentType:"application/json",
+      data: JSON.stringify(data),
+      success:function(res){
+        if(res.error){ alert(res.error); return; }
+        let row = `<tr data-id="${res.id}">
+          <td data-field="CLIENT_NAME" contenteditable="true">${res.CLIENT_NAME}</td>
+          <td data-field="LICENSE_GUID" contenteditable="true">${res.LICENSE_GUID}</td>
+          <td data-field="MAXNETWORKS" contenteditable="true">${res.MAXNETWORKS}</td>
+          <td data-field="MAXADAPTERS" contenteditable="true">${res.MAXADAPTERS}</td>
+          <td data-field="MT" contenteditable="true">${res.MT}</td>
+          <td data-field="TP" contenteditable="true">${res.TP}</td>
+          <td data-field="TCPIP" contenteditable="true">${res.TCPIP}</td>
+          <td data-field="SYBASE" contenteditable="true">${res.SYBASE}</td>
+          <td data-field="WEBSERVICE" contenteditable="true">${res.WEBSERVICE}</td>
+          <td data-field="MSMQ" contenteditable="true">${res.MSMQ}</td>
+          <td data-field="MQSERIES" contenteditable="true">${res.MQSERIES}</td>
+          <td data-field="STATUS" contenteditable="true">${res.STATUS}</td>
+          <td class="last-updated">${res.LAST_UPDATED}</td>
+        </tr>`;
+        $("#rdvTable tbody").append(row);
+        $("#rdvForm")[0].reset();
+      }
+    });
+  });
+
+  // --- Add Nimbus License ---
+  $("#nimbusForm").submit(function(e){
+    e.preventDefault();
+    let data = {};
+    $(this).serializeArray().forEach(x => data[x.name] = x.value);
+
+    $.ajax({
+      url:"/add_nimbus_license",
+      type:"POST",
+      contentType:"application/json",
+      data: JSON.stringify(data),
+      success:function(res){
+        if(res.error){ alert(res.error); return; }
+        let row = `<tr data-id="${res.id}">
+          <td data-field="CLIENT_NAME" contenteditable="true">${res.CLIENT_NAME}</td>
+          <td data-field="LICENSE_GUID" contenteditable="true">${res.LICENSE_GUID}</td>
+          <td data-field="MAXTERMINALS" contenteditable="true">${res.MAXTERMINALS}</td>
+          <td class="last-updated">${res.LAST_UPDATED}</td>
+        </tr>`;
+        $("#nimbusTable tbody").append(row);
+        $("#nimbusForm")[0].reset();
+      }
+    });
+  });
+
+  // --- Inline Edit Save ---
+  $("#rdvTable, #nimbusTable").on("blur","td[contenteditable=true]",function(){
+    let td = $(this);
+    let value = td.text().trim();
+    let field = td.data("field");
+    let id = td.closest("tr").data("id");
+    let table = td.closest("table").attr("id")==="rdvTable" ? "RDV_LICENSES" : "NIMBUS_LICENSES";
+
+    $.ajax({
+      url:"/update_license",
+      type:"POST",
+      contentType:"application/json",
+      data: JSON.stringify({id:id, field:field, value:value, table:table}),
+      success:function(res){
+        if(res.error){ alert(res.error); return; }
+        td.closest("tr").find(".last-updated").text(res.LAST_UPDATED);
+      }
+    });
+  });
+
+});
+</script>
+</body>
+</html>

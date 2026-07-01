@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SLA Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+      border: 1px solid #ddd;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .file-actions button {
+      margin: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .download-btn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    .delete-btn {
+      background-color: #f44336;
+      color: white;
+    }
+    .upload-btn {
+      background-color: #2196F3;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>SLA Dashboard</h1>
+  <!-- 🔽 Dropdown Filter -->
+  <form method="GET" action="/">
+    <label for="bank">Filter by Bank:</label>
+    <select name="bank" id="bank" onchange="this.form.submit()">
+      <option value="">All Banks</option>
+      {% for bank in all_banks %}
+        <option value="{{ bank }}" {% if bank == selected_bank %}selected{% endif %}>{{ bank }}</option>
+      {% endfor %}
+    </select>
+  </form>	
+  <table>
+    <tr>
+      <th>Bank Name</th>
+      <th>Period</th>
+      <th>SLA 2023</th>
+      <th>SLA 2024</th>
+      <th>SLA 2025</th>
+      <th>Upload Date</th>
+      <th>Modified Date</th>
+      <th>Document</th>
+      <th>Actions</th>
+    </tr>
+    {% for row in data %}
+    <tr>
+      <td>{{ row['BANK_NAME'] }}</td>
+      <td>{{ row['PERIOD'] }}</td>
+      <td>{{ row['YEAR_2023'] }}</td>
+      <td>{{ row['YEAR_2024'] }}</td>
+      <td>{{ row['YEAR_2025'] }}</td>
+      <td>{{ row['UPLOAD_DATE'] or '' }}</td>
+      <td>{{ row['MODIFIED_DATE'] or '' }}</td>
+      <td>
+        {% if row.SLA_DOC_FILENAME %}
+          {{ row.SLA_DOC_FILENAME }}
+        {% else %}
+          No file
+        {% endif %}
+      </td>
+      <td class="file-actions">
+        {% if row.SLA_DOC_FILENAME %}
+          <a class="download-btn" href="/download?bank={{ row['BANK_NAME'] }}&period={{ row['PERIOD'] }}">Download</a>
+          <form method="POST" action="/delete" style="display:inline;">
+            <input type="hidden" name="bank" value="{{ row['BANK_NAME'] }}">
+            <input type="hidden" name="period" value="{{ row['PERIOD'] }}">
+            <button class="delete-btn" type="submit">Delete</button>
+          </form>
+        {% endif %}
+        <form method="POST" action="/upload" enctype="multipart/form-data">
+          <input type="hidden" name="bank" value="{{ row['BANK_NAME'] }}">
+          <input type="hidden" name="period" value="{{ row['PERIOD'] }}">
+          <input type="file" name="file" accept=".pdf,.doc,.docx" required>
+          <button class="upload-btn" type="submit">Upload</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+   <!-- 📊 Chart for 2023, 2024, 2025 -->
+  <h2 style="margin-top: 40px;">SLA Comparison (2023 vs 2024 vs 2025)</h2>
+  <canvas id="slaChart" width="800" height="400"></canvas>
+
+  <script>
+    const labels = {{ chart_labels | tojson }};
+    const data2023 = {{ chart_data_2023 | tojson }};
+    const data2024 = {{ chart_data_2024 | tojson }};
+    const data2025 = {{ chart_data_2025 | tojson }};
+
+    new Chart(document.getElementById('slaChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'SLA 2023',
+            backgroundColor: '#2196F3',
+            data: data2023
+          },
+          {
+            label: 'SLA 2024',
+            backgroundColor: '#FFC107',
+            data: data2024
+          },
+          {
+            label: 'SLA 2025',
+            backgroundColor: '#4CAF50',
+            data: data2025
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

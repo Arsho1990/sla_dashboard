@@ -1,0 +1,780 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  h1, h4, h5, label {
+    color: var(--accent-color);
+    font-weight: bold;
+  }
+  
+  .form-select, .form-control {
+    background-color: var(--bg-primary);
+    border: 2px solid var(--border-color);
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .form-select:focus, .form-control:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 0.2rem var(--accent-light);
+  }
+
+  canvas {
+    background-color: var(--bg-primary);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+
+  html.dark-mode canvas {
+    background-color: #252525;
+    border-color: #444444;
+  }
+</style>
+<div class="container mt-4">
+  <h1 class="mt-4" style="color:#4B0082;">Bank SLA Data</h1>
+
+  <!-- Filters row -->
+  <div class="row mb-3">
+    <div class="col-md-4">
+      <label class="form-label">Bank</label>
+      <select id="slaBankFilter" class="form-select">
+        <option value="">All</option>
+        {% for b in banks %}
+          <option value="{{ b }}" {% if b == selected_bank %}selected{% endif %}>{{ b }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Currency</label>
+      <select id="slaCurrencyFilter" class="form-select">
+        <option value="">All</option>
+        {% for c in currencies %}
+          <option value="{{ c }}" {% if c == selected_currency %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Year</label>
+      <select id="slaYearFilter" class="form-select">
+        <option value="">All</option>
+        {% for y in years %}
+          <option value="{{ y }}" {% if y|string == (selected_year|string) %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <!-- bank logo shown when a single bank is selected -->
+  <div class="text-center mb-3">
+    {% if selected_bank %}
+      <img src="{{ url_for('static', filename='logos/' + (selected_bank|replace(' ','_')|replace('(','')|replace(')','')) + '.png') }}" height="60" alt="{{ selected_bank }}">
+    {% endif %}
+  </div>
+
+  <!-- Add SLA form (admin only) -->
+  {% if role == "admin" %}
+  <h5 class="mt-4" style="color:#4B0082;">➕ Add SLA Record</h5>
+  <form id="addSlaForm" class="row g-3" method="post" action="{{ url_for('add_sla') }}">
+    <div class="col-md-3">
+      <label class="form-label">Bank Name</label>
+      <select class="form-select" name="BANK_NAME" required>
+        {% for b in banks %}
+          <option value="{{ b }}">{{ b }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Currency</label>
+      <select class="form-select" name="CURRENCY_MODE" required>
+        {% for c in currencies %}
+          <option value="{{ c }}">{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Year</label>
+      <select class="form-select" name="SLA_YEAR" required>
+        {% for y in years %}
+          <option value="{{ y }}">{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Current Cost</label>
+      <input type="number" class="form-control" name="CURRENT_YEAR_COST" step="0.01" required>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Last Cost</label>
+      <input type="number" class="form-control" name="LAST_YEAR_COST" step="0.01" required>
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">Additional Items Cost</label>
+      <input type="number" class="form-control" name="ADDITIONAL_ITEMS_COST" step="0.01" value="0">
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">Subtraction Items Cost</label>
+      <input type="number" class="form-control" name="SUBTRACTION_ITEMS_COST" step="0.01" value="0">
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Status</label>
+      <select class="form-select" name="STATUS">
+        <option value="Active">✅ Active</option>
+        <option value="Inactive">❌ Inactive</option>
+      </select>
+    </div>
+
+    <div class="col-12 d-flex align-items-center gap-3">
+      <button type="submit" class="btn btn-primary" style="background-color:#4B0082;border:none;">Add SLA</button>
+      <button type="button" class="btn btn-outline-secondary" onclick="openFormulasModal()" style="border-color:#4B0082;color:#4B0082;font-weight:600;">
+        📐 Calculation Formulas
+      </button>
+    </div>
+  </form>
+  {% endif %}
+
+  <!-- Formulas Modal (dynamic) -->
+  <div id="formulasModal" onclick="if(event.target===this)closeFormulasModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-primary);color:var(--text-primary);border:2px solid #4B0082;border-radius:12px;max-width:680px;width:95%;padding:28px 32px;position:relative;box-shadow:0 8px 32px rgba(75,0,130,0.25);max-height:90vh;overflow-y:auto;">
+      <button onclick="closeFormulasModal()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-primary);">✕</button>
+      <h5 style="color:#4B0082;font-weight:700;margin-bottom:20px;font-size:1.15rem;">📐 Calculation Formulas</h5>
+      <div id="formulaCardsContainer" style="display:flex;flex-direction:column;gap:14px;font-size:0.92rem;">
+        <div style="text-align:center;padding:20px;color:#888;">⏳ Loading...</div>
+      </div>
+      {% if role == 'admin' %}
+      <div style="margin-top:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <button onclick="saveFormulas()" class="btn btn-primary" style="background-color:#4B0082;border:none;font-weight:600;">💾 Save &amp; Recalculate All</button>
+        <span id="formulaSaveStatus" style="font-size:0.88rem;"></span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- SLA table -->
+  <table class="table table-bordered table-striped mt-4" style="background-color: var(--bg-primary); color: var(--text-primary);">
+    <thead class="table-dark" style="background-color: var(--accent-color); color: white;">
+      <tr>
+        <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Bank Name</th>
+        <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Currency</th>
+        <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Year</th>
+        <th class="text-end" style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Current Year Cost</th>
+        <th class="text-end" style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Last Year Cost</th>
+        <th class="text-end" style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Additional Items Cost</th>
+        <th class="text-end" style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Subtraction Items Cost</th>
+        <th class="text-end" style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Increment</th>
+        <th class="text-end" style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Increment With Addition</th>
+        <th class="text-end" style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Increment % (Excl. Additional)</th>
+        <th class="text-end" style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Increment % (Incl. Additional)</th>
+        <th style="background-color: var(--accent-color); color: white; border-color: var(--border-color);">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sla %}	  
+      <tr data-id="{{ s.ID }}" style="background-color: var(--bg-primary); color: var(--text-primary);">
+        <!-- single cell contains logo + bank name -->
+        <td style="white-space:nowrap; background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+          {% if s.LOGO_FILENAME %}
+            <img src="{{ url_for('static', filename='logos/' + s.LOGO_FILENAME) }}" alt="{{ s.BANK_NAME }}" height="30" style="margin-right:8px;">
+          {% endif %}
+          {{ s.BANK_NAME }}
+        </td>
+        <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">{{ s.CURRENCY_MODE }}</td>
+        <td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">{{ s.SLA_YEAR }}</td>
+
+	<!-- Editable fields for admin -->
+	  		
+	  	<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);" data-field="CURRENT_YEAR_COST">{{ "{:,.0f}".format(s.CURRENT_YEAR_COST|float) }}</td>
+	  	
+	  	<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);" data-field="LAST_YEAR_COST">{{ "{:,.0f}".format(s.LAST_YEAR_COST|float) }}</td>
+	  	
+	  	<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);" data-field="ADDITIONAL_ITEMS_COST">{{ "{:,.0f}".format(s.ADDITIONAL_ITEMS_COST|float) }}</td>
+	  	
+	  	<td contenteditable="{{ 'true' if role == 'admin' else 'false' }}" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);" data-field="SUBTRACTION_ITEMS_COST">{{ "{:,.0f}".format(s.SUBTRACTION_ITEMS_COST|float) }}</td>
+	  	
+	  	<!-- Non-editable fields -->
+	  	<td class="text-end" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">{{ "{:,.0f}".format(s.SLA_INCREMENT|float) }}</td>
+	  	<td class="text-end" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">{{ "{:,.0f}".format(s.SLA_INCREMENT_WITH_ADDITION|float) }}</td>
+	  	<td class="text-end" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+	  		{% if s.INCREMENT_PER is not none %}{{ "{:.2f}".format(s.INCREMENT_PER|float) }}%{% else %}-{% endif %}
+	  	</td>
+	  	<td class="text-end" style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color);">
+	  		{% if s.INCREMENT_PER_WITH_ADDITION is not none %}{{ "{:.2f}".format(s.INCREMENT_PER_WITH_ADDITION|float) }}%{% else %}-{% endif %}
+	  	</td>
+	  	<td style="background-color: var(--bg-primary); color: var(--text-primary); border-color: var(--border-color); text-align:center;">
+	  	  {% if role == 'admin' %}
+	  	  <select onchange="updateSlaStatus({{ s.ID }}, this.value)"
+	  	    style="padding:4px 8px;border-radius:4px;border:1px solid #ccc;background:var(--bg-primary);color:var(--text-primary);font-size:12px;cursor:pointer;">
+	  	    <option value="Active" {% if (s.STATUS or '') != 'Inactive' %}selected{% endif %}>✅ Active</option>
+	  	    <option value="Inactive" {% if s.STATUS == 'Inactive' %}selected{% endif %}>❌ Inactive</option>
+	  	  </select>
+	  	  {% else %}
+	  	    {% if s.STATUS == 'Inactive' %}
+	  	    <span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;background:#FFEBEE;color:#C62828;">❌ Inactive</span>
+	  	    {% else %}
+	  	    <span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;background:#E8F5E9;color:#2E7D32;">✅ Active</span>
+	  	    {% endif %}
+	  	  {% endif %}
+	  	</td>
+	</tr>
+	{% endfor %}
+	</tbody>
+  </table>
+
+<h5 class="mt-4">📊 SLA Increment % Comparison</h5>
+<canvas id="slaIncrementChart"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+function getChartColorsForSla() {
+  const isDarkMode = document.documentElement.classList.contains('dark-mode');
+  return {
+    isDark: isDarkMode,
+    textColor: isDarkMode ? '#f0f0f0' : '#1a1a1a',
+    gridColor: isDarkMode ? '#444444' : '#e0e0e0',
+    borderColor: isDarkMode ? '#555555' : '#cccccc',
+    backgroundColor1: '#3498DB',  // Blue
+    backgroundColor2: '#E74C3C'   // Red/Pink
+  };
+}
+
+function loadSlaIncrementChart(data){
+  const ctx = document.getElementById("slaIncrementChart").getContext("2d");
+  const colors = getChartColorsForSla();
+  
+  // Filter out null/undefined values
+  const filteredData = data.filter(r => r.INCREMENT_PER !== null && r.INCREMENT_PER !== undefined);
+
+  // destroy old chart instance if reloading
+  if (window.slaChartInstance) {
+    window.slaChartInstance.destroy();
+  }
+
+  window.slaChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: filteredData.map(r => r.BANK_NAME + " (" + r.CURRENCY_MODE + ") " + r.SLA_YEAR),
+      datasets: [
+        {
+          label: "Increment % (Excl. Additional)",
+          data: filteredData.map(r => r.INCREMENT_PER || 0),
+          backgroundColor: colors.backgroundColor1,
+          borderColor: '#2980B9',
+          borderWidth: 2,
+          borderRadius: 4
+        },
+        {
+          label: "Increment % (Incl. Additional)",
+          data: filteredData.map(r => r.INCREMENT_PER_WITH_ADDITION || 0),
+          backgroundColor: colors.backgroundColor2,
+          borderColor: '#C0392B',
+          borderWidth: 2,
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { 
+          position: 'top',
+          labels: {
+            color: colors.textColor,
+            font: { size: 13, weight: '600' },
+            padding: 15
+          }
+        },
+        tooltip: {
+          backgroundColor: colors.isDark ? '#333333' : '#ffffff',
+          titleColor: colors.textColor,
+          bodyColor: colors.textColor,
+          borderColor: colors.borderColor,
+          borderWidth: 2,
+          padding: 12,
+          titleFont: { size: 12, weight: 'bold' },
+          bodyFont: { size: 11 },
+          callbacks: {
+            label: function(context) {
+              return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { 
+          title: { 
+            display: true, 
+            text: "Bank / Currency / Year",
+            color: colors.textColor,
+            font: { size: 12, weight: 'bold' }
+          },
+          ticks: {
+            color: colors.textColor,
+            autoSkip: false,
+            maxRotation: 45,
+            minRotation: 30,
+            font: { size: 10 }
+          },
+          grid: { color: colors.gridColor }
+        },
+        y: { 
+          title: { 
+            display: true, 
+            text: "Increment %",
+            color: colors.textColor,
+            font: { size: 12, weight: 'bold' }
+          },
+          ticks: {
+            color: colors.textColor,
+            callback: function(value) { return value.toFixed(1) + "%"; },
+            font: { size: 10 }
+          },
+          grid: { color: colors.gridColor }
+        }
+      }
+    }
+  });
+}
+
+loadSlaIncrementChart({{ sla|tojson }});
+</script>
+
+<script>
+/* Auto-load formula config on page load to populate the footer expression */
+document.addEventListener('DOMContentLoaded', function() {
+  fetch('/api/sla-formula-config')
+    .then(function(r){ return r.json(); })
+    .then(function(cfg){
+      var iwa = {};
+      cfg.forEach(function(c){ if(c.FORMULA_KEY==='increment_with_addition') iwa = c; });
+      var el = document.getElementById('ywt_expr_iwa');
+      if (!el) return;
+      var add = +iwa.ADDITIONAL_SIGN, sub = +iwa.SUBTRACTION_SIGN;
+      var expr = '(Current \u2212 Last)';
+      if (add !== 0) expr += ' ' + (add===1?'+':'\u2212') + ' Additional Items Cost';
+      if (sub !== 0) expr += ' ' + (sub===1?'+':'\u2212') + ' Subtraction Items Cost';
+      el.textContent = expr;
+    })
+    .catch(function(){ /* leave as-is on error */ });
+});
+</script>
+
+<h4 class="mt-4" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+  💰 Year-wise Totals by Currency
+  <button type="button" onclick="openFormulasModal()"
+    style="font-size:0.82rem;padding:5px 14px;border-radius:20px;border:2px solid #4B0082;background:transparent;color:#4B0082;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+    📐 Calculation Formulas
+    {% if role == 'admin' %}<span style="font-size:0.72rem;background:#4B0082;color:#fff;border-radius:10px;padding:1px 7px;margin-left:2px;">editable</span>{% endif %}
+  </button>
+</h4>
+<table class="table table-bordered">
+  <thead class="table-dark">
+    <tr>
+      <th>Currency</th>
+      <th>Year</th>
+      <th>Current Year Cost</th>
+      <th>Last Year Cost</th>
+      <th>Additional Items Cost</th>
+      <th>Subtraction Items Cost</th>
+      <th>Increment</th>
+      <th>Increment With Addition</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in currency_totals %}
+    <tr>
+      <td>{{ row.CURRENCY_MODE }}</td>
+      <td>{{ row.SLA_YEAR }}</td>
+      <td>{{ "{:,.0f}".format(row.CURRENT_YEAR_COST or 0) }}</td>
+      <td>{{ "{:,.0f}".format(row.LAST_YEAR_COST or 0) }}</td>
+      <td>{{ "{:,.0f}".format(row.ADDITIONAL_ITEMS_COST or 0) }}</td>
+      <td>{{ "{:,.0f}".format(row.SUBTRACTION_ITEMS_COST or 0) }}</td>
+      <td>{{ "{:,.0f}".format(row.SLA_INCREMENT or 0) }}</td>
+      <td>{{ "{:,.0f}".format(row.SLA_INCREMENT_WITH_ADDITION or 0) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr style="background:rgba(75,0,130,0.06);font-size:0.78rem;color:#666;">
+      <td colspan="8" style="padding:8px 12px;">
+        <strong style="color:#4B0082;">📐 Formulas:</strong>
+        &nbsp;&nbsp;
+        <strong>Increment</strong> = Current Year Cost − Last Year Cost
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        <strong>Increment With Addition</strong> = <span id="ywt_expr_iwa" style="font-style:italic;">loading…</span>
+        &nbsp;&nbsp;
+        <button onclick="openFormulasModal()" style="font-size:0.75rem;padding:2px 10px;border-radius:12px;border:1px solid #4B0082;background:transparent;color:#4B0082;cursor:pointer;font-weight:600;">✏️ Edit</button>
+      </td>
+    </tr>
+  </tfoot>
+</table>
+
+<h4 class="mt-4">📊 Active / Inactive Clients by Year</h4>
+<table class="table table-bordered">
+  <thead class="table-dark">
+    <tr>
+      <th>Year</th>
+      <th>✅ Active</th>
+      <th>❌ Inactive</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in year_status_counts %}
+    <tr>
+      <td><strong>{{ row.SLA_YEAR }}</strong></td>
+      <td><span style="display:inline-block;padding:3px 14px;border-radius:12px;font-weight:700;background:#E8F5E9;color:#2E7D32;">{{ row.ACTIVE }}</span></td>
+      <td><span style="display:inline-block;padding:3px 14px;border-radius:12px;font-weight:700;background:#FFEBEE;color:#C62828;">{{ row.INACTIVE }}</span></td>
+      <td><strong>{{ row.ACTIVE + row.INACTIVE }}</strong></td>
+    </tr>
+    {% endfor %}
+    {% if not year_status_counts %}
+    <tr><td colspan="4" class="text-center text-muted">No data</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+
+</div>
+
+<script>
+function loadIncrementChart(data) {
+  const ctx = document.getElementById("incrementChart").getContext("2d");
+
+  const years = [...new Set(data.map(r => r.SLA_YEAR))].sort();
+
+  const excl = years.map(y => {
+    const rec = data.find(r => r.SLA_YEAR == y);
+    return rec ? rec.INCREMENT_PER : 0;
+  });
+
+  const incl = years.map(y => {
+    const rec = data.find(r => r.SLA_YEAR == y);
+    return rec ? rec.INCREMENT_PER_WITH_ADDITION : 0;
+  });
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [
+        {
+          label: "Increment % (Excl. Additional)",
+          data: excl,
+          borderColor: "rgba(54, 162, 235, 1)",
+          backgroundColor: "rgba(54, 162, 235, 0.2)",
+          tension: 0.2
+        },
+        {
+          label: "Increment % (Incl. Additional)",
+          data: incl,
+          borderColor: "rgba(255, 99, 132, 1)",
+          backgroundColor: "rgba(255, 99, 132, 0.2)",
+          tension: 0.2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(2) + "%";
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: "% Increment" },
+          ticks: { callback: v => v + "%" }
+        }
+      }
+    }
+  });
+}
+
+// 🔄 Call when page loads with full SLA data
+loadIncrementChart({{ sla|tojson }});
+</script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // simple filter handler -> rebuild querystring
+  function buildAndGo() {
+    const bank = document.getElementById('slaBankFilter').value;
+    const currency = document.getElementById('slaCurrencyFilter').value;
+    const year = document.getElementById('slaYearFilter').value;
+    let params = new URLSearchParams();
+    if (bank) params.set('bank', bank);
+    if (currency) params.set('currency', currency);
+    if (year) params.set('year', year);
+    const q = params.toString();
+    window.location = '/sla' + (q ? ('?' + q) : '');
+  }
+
+  document.getElementById('slaBankFilter').addEventListener('change', buildAndGo);
+  document.getElementById('slaCurrencyFilter').addEventListener('change', buildAndGo);
+  document.getElementById('slaYearFilter').addEventListener('change', buildAndGo);
+
+  // Chart placeholder — you can prepare JSON data server-side and inject for real graphing.
+  // (left minimal; optional enhancement later)
+  (function(){
+    const ctx = document.getElementById('slaChart').getContext('2d');
+    new Chart(ctx, { type:'bar', data:{ labels:[], datasets:[]}, options:{} });
+  })();
+</script>
+
+<script>
+function updateSlaStatus(id, value) {
+  fetch("/update_sla/" + id, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ field: "STATUS", value: value })
+  }).then(r => r.json()).then(res => {
+    if (!res.success) alert("Failed to update status: " + (res.error || ''));
+  });
+}
+
+document.querySelectorAll("td[contenteditable='true']").forEach(td => {
+  td.addEventListener("blur", function() {
+    const row = td.closest("tr");
+    const id = row.getAttribute("data-id");
+    const field = td.getAttribute("data-field");
+    let value = td.innerText.trim();
+
+    // remove commas for numbers
+    if (["CURRENT_YEAR_COST","LAST_YEAR_COST","ADDITIONAL_ITEMS_COST"].includes(field)) {
+      value = value.replace(/,/g, "");
+    }
+
+    fetch("/update_sla/" + id, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field, value })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        // reload page or update row with recalculated values
+        location.reload();
+      } else {
+        alert("Update failed: " + res.error);
+      }
+    });
+  });
+});
+</script>
+
+<script>
+const IS_ADMIN = {{ 'true' if role == 'admin' else 'false' }};
+let formulaConfig = null;
+
+function openFormulasModal() {
+  document.getElementById('formulasModal').style.display = 'flex';
+  loadFormulaConfig();
+}
+function closeFormulasModal() {
+  document.getElementById('formulasModal').style.display = 'none';
+}
+
+/* ── expression builder ── */
+function signChar(s) { return +s === 1 ? '+' : '\u2212'; }
+function buildExprIWA(addSign, subSign) {
+  var expr = '(Current \u2212 Last)';
+  if (+addSign !== 0) expr += ' ' + signChar(addSign) + ' Additional Items Cost';
+  if (+subSign !== 0) expr += ' ' + signChar(subSign) + ' Subtraction Items Cost';
+  return expr;
+}
+function buildExprPct(addSign, subSign) {
+  var num = 'Current';
+  if (+addSign !== 0) num += ' ' + signChar(addSign) + ' Additional Items Cost';
+  if (+subSign !== 0) num += ' ' + signChar(subSign) + ' Subtraction Items Cost';
+  return '(' + num + ' \u2212 Last) \xf7 Last \xd7 100';
+}
+
+/* ── read current sign value from a formula row ── */
+function readSign(key, fieldName) {
+  var incl = document.getElementById('incl_' + key + '_' + fieldName);
+  if (!incl || !incl.checked) return 0;
+  var sign = document.getElementById('sign_' + key + '_' + fieldName);
+  return sign ? +sign.value : 1;
+}
+
+/* ── live update preview expression ── */
+function updateExpr(key) {
+  var el = document.getElementById('expr_' + key);
+  if (!el) return;
+  var fn = key === 'increment_with_addition' ? buildExprIWA : buildExprPct;
+  el.textContent = fn(readSign(key, 'add'), readSign(key, 'sub'));
+}
+
+/* ── toggle field row visibility when checkbox changes ── */
+function onToggleField(key, fieldName) {
+  var incl   = document.getElementById('incl_' + key + '_' + fieldName);
+  var signEl = document.getElementById('sign_' + key + '_' + fieldName);
+  var label  = document.getElementById('lbl_' + key + '_' + fieldName);
+  if (signEl) signEl.style.display = incl.checked ? '' : 'none';
+  if (label)  label.style.opacity  = incl.checked ? '1' : '0.4';
+  updateExpr(key);
+}
+
+/* ── build one field row (toggle + optional sign buttons) ── */
+function fieldRow(key, fieldLabel, fieldName, sign) {
+  var included  = +sign !== 0;
+  var signValue = included ? sign : 1;           // default + when re-adding
+  var row = '<div id="lbl_' + key + '_' + fieldName + '" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 0;border-bottom:1px dashed rgba(75,0,130,0.15);opacity:' + (included ? '1' : '0.4') + ';">';
+
+  /* toggle switch */
+  row += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:220px;">'
+       + '<input type="checkbox" id="incl_' + key + '_' + fieldName + '" '
+       + (included ? 'checked' : '') + ' '
+       + 'onchange="onToggleField(\'' + key + '\',\'' + fieldName + '\')" '
+       + 'style="width:16px;height:16px;accent-color:#4B0082;cursor:pointer;">'
+       + '<span style="font-size:0.88rem;font-weight:600;">' + fieldLabel + '</span>'
+       + '</label>';
+
+  /* +/- radio buttons — shown only when included */
+  row += '<div id="sign_' + key + '_' + fieldName + '" style="display:' + (included ? 'flex' : 'none') + ';gap:6px;">';
+  [[1,'＋ Add'],[-1,'－ Subtract']].forEach(function(opt) {
+    var active = +opt[0] === +signValue;
+    row += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:4px 10px;border-radius:20px;border:2px solid ' + (active ? '#4B0082' : '#ccc') + ';background:' + (active ? '#4B0082' : 'transparent') + ';color:' + (active ? '#fff' : 'var(--text-primary)') + ';font-size:0.82rem;font-weight:600;transition:all .15s;" '
+         + 'onclick="selectSign(\'' + key + '\',\'' + fieldName + '\',' + opt[0] + ',this)">'
+         + '<input type="radio" name="signr_' + key + '_' + fieldName + '" value="' + opt[0] + '" ' + (active ? 'checked' : '') + ' style="display:none;">'
+         + opt[1] + '</label>';
+  });
+  row += '</div>';
+  row += '</div>';
+  return row;
+}
+
+/* ── pill-style sign selection ── */
+function selectSign(key, fieldName, val, clickedLabel) {
+  /* update radio */
+  var radios = document.querySelectorAll('input[name="signr_' + key + '_' + fieldName + '"]');
+  radios.forEach(function(r){ r.checked = +r.value === +val; });
+  /* restyle pills */
+  var container = document.getElementById('sign_' + key + '_' + fieldName);
+  if (container) {
+    container.querySelectorAll('label').forEach(function(lbl){
+      var r = lbl.querySelector('input');
+      var active = r && +r.value === +val;
+      lbl.style.borderColor  = active ? '#4B0082' : '#ccc';
+      lbl.style.background   = active ? '#4B0082' : 'transparent';
+      lbl.style.color        = active ? '#fff'    : 'var(--text-primary)';
+    });
+  }
+  updateExpr(key);
+}
+
+/* ── build one formula card ── */
+function formulaCard(key, label, addSign, subSign, color, exprFn) {
+  var expr = exprFn(+addSign, +subSign);
+  var html = '<div style="background:var(--bg-secondary,#f5f0ff);border-left:4px solid ' + color + ';border-radius:8px;padding:14px 16px;">'
+    + '<div style="font-weight:700;color:' + color + ';margin-bottom:8px;">' + label + '</div>'
+    + '<div style="margin-bottom:10px;padding:8px 12px;background:rgba(75,0,130,0.07);border-radius:6px;">'
+    + '<span style="font-size:0.75rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;">Preview: </span>'
+    + '<code id="expr_' + key + '" style="font-size:0.9rem;">' + expr + '</code></div>';
+
+  if (IS_ADMIN) {
+    html += '<div style="display:flex;flex-direction:column;gap:4px;">'
+          + fieldRow(key, 'Additional Items Cost', 'add', addSign)
+          + fieldRow(key, 'Subtraction Items Cost', 'sub', subSign)
+          + '</div>';
+  } else {
+    /* read-only for non-admin */
+    if (+addSign !== 0) html += '<div style="font-size:0.82rem;color:#888;margin-top:4px;">&#x2705; Additional Items Cost (' + (addSign>0?'added':'subtracted') + ')</div>';
+    else                html += '<div style="font-size:0.82rem;color:#aaa;margin-top:4px;">&#x274c; Additional Items Cost (excluded)</div>';
+    if (+subSign !== 0) html += '<div style="font-size:0.82rem;color:#888;">&#x2705; Subtraction Items Cost (' + (subSign>0?'added':'subtracted') + ')</div>';
+    else                html += '<div style="font-size:0.82rem;color:#aaa;">&#x274c; Subtraction Items Cost (excluded)</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/* ── load and render ── */
+function loadFormulaConfig() {
+  document.getElementById('formulaCardsContainer').innerHTML = '<div style="text-align:center;padding:20px;color:#888;">\u23f3 Loading...</div>';
+  fetch('/api/sla-formula-config')
+    .then(function(r){ return r.json(); })
+    .then(function(cfg){
+      formulaConfig = {};
+      cfg.forEach(function(c){ formulaConfig[c.FORMULA_KEY] = c; });
+      renderFormulas();
+    })
+    .catch(function(){
+      document.getElementById('formulaCardsContainer').innerHTML = '<div style="color:red;">\u274c Failed to load formulas.</div>';
+    });
+}
+function renderFormulas() {
+  var iwa  = formulaConfig['increment_with_addition'] || {ADDITIONAL_SIGN:1,  SUBTRACTION_SIGN:-1, UPDATED_BY:null};
+  var excl = formulaConfig['increment_per_excl']      || {ADDITIONAL_SIGN:-1, SUBTRACTION_SIGN:1};
+  var incl = formulaConfig['increment_per_incl']      || {ADDITIONAL_SIGN:1,  SUBTRACTION_SIGN:-1};
+  var lastBy = iwa.UPDATED_BY
+    ? '<em style="font-size:0.78rem;color:#888;">Last saved by <strong>' + iwa.UPDATED_BY + '</strong></em>'
+    : '';
+  var html = [
+    /* fixed Increment card */
+    '<div style="background:var(--bg-secondary,#f5f0ff);border-left:4px solid #4B0082;border-radius:8px;padding:14px 16px;">'
+      + '<div style="font-weight:700;color:#4B0082;margin-bottom:6px;">Increment '
+      + '<span style="font-weight:400;font-size:0.78rem;color:#888;">(fixed \u2014 not editable)</span></div>'
+      + '<div style="padding:8px 12px;background:rgba(75,0,130,0.07);border-radius:6px;">'
+      + '<code>Current Year Cost \u2212 Last Year Cost</code></div>'
+      + '<div style="margin-top:6px;font-size:0.82rem;color:#aaa;">\u274c Additional Items Cost &nbsp; \u274c Subtraction Items Cost</div>'
+      + '</div>',
+    formulaCard('increment_with_addition','Increment With Addition',        iwa.ADDITIONAL_SIGN,  iwa.SUBTRACTION_SIGN,  '#6a0dad', buildExprIWA),
+    formulaCard('increment_per_excl',     'Increment % (Excl. Additional)', excl.ADDITIONAL_SIGN, excl.SUBTRACTION_SIGN, '#9b30ff', buildExprPct),
+    formulaCard('increment_per_incl',     'Increment % (Incl. Additional)', incl.ADDITIONAL_SIGN, incl.SUBTRACTION_SIGN, '#b44fff', buildExprPct),
+    '<div style="background:var(--bg-secondary,#f5f0ff);border-left:4px solid #ccaaff;border-radius:6px;padding:10px 16px;font-size:0.82rem;color:var(--text-secondary,#555);">'
+      + '<strong>Note:</strong> % formulas show \u2014 when Last Year Cost = 0. '
+      + lastBy + '</div>'
+  ].join('');
+  document.getElementById('formulaCardsContainer').innerHTML = html;
+
+  /* Update inline footer in Year-wise Totals table */
+  var footerEl = document.getElementById('ywt_expr_iwa');
+  if (footerEl) footerEl.textContent = '(Current \u2212 Last)'
+    + (+iwa.ADDITIONAL_SIGN !== 0 ? ' ' + (+iwa.ADDITIONAL_SIGN === 1 ? '+' : '\u2212') + ' Additional Items Cost' : '')
+    + (+iwa.SUBTRACTION_SIGN !== 0 ? ' ' + (+iwa.SUBTRACTION_SIGN === 1 ? '+' : '\u2212') + ' Subtraction Items Cost' : '');
+}
+
+/* ── save ── */
+function saveFormulas() {
+  var keys = ['increment_with_addition','increment_per_excl','increment_per_incl'];
+  var payload = keys.map(function(k){
+    return { key: k, additional_sign: readSign(k,'add'), subtraction_sign: readSign(k,'sub') };
+  });
+  var statusEl = document.getElementById('formulaSaveStatus');
+  statusEl.textContent = '\u23f3 Saving & recalculating...';
+  statusEl.style.color = '#888';
+  fetch('/api/sla-formula-config', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if (res.success) {
+      statusEl.textContent = '\u2705 Saved! Reloading...';
+      statusEl.style.color = 'green';
+      setTimeout(function(){ location.reload(); }, 900);
+    } else {
+      statusEl.textContent = '\u274c Error: ' + (res.error || 'Unknown error');
+      statusEl.style.color = 'red';
+    }
+  })
+  .catch(function(){
+    statusEl.textContent = '\u274c Network error';
+    statusEl.style.color = 'red';
+  });
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,252 @@
+from flask import Flask, request, render_template, send_file, redirect, session, jsonify
+import pandas as pd
+import oracledb
+import io
+from datetime import datetime
+
+app = Flask(__name__)
+app.secret_key = 'your_super_secret_key_here'
+
+def get_connection():
+    return oracledb.connect(user="asnafees", password="Gryhhhbbn1", dsn="172.16.0.84:1521/orcl.avanza.pk")
+
+@app.route('/')
+def dashboard():
+    if 'username' not in session:
+        return redirect('/login')
+
+    selected_bank = request.args.get('bank')
+
+    conn = get_connection()
+    df = pd.read_sql("SELECT * FROM SLA", conn)
+    conn.close()
+    
+    for col in ['YEAR_2023', 'YEAR_2024', 'YEAR_2025']:
+        df[col] = (
+            df[col].astype(str)
+                  .str.replace(',', '', regex=False)
+                  .str.strip()
+                  .replace({'None': '0', 'null': '0', '': '0'})
+                  .astype(float)
+        )
+
+    df['SLA_CURRENCY'] = df['SLA_CURRENCY'].astype(str).str.upper().str.strip().fillna('UNKNOWN')
+
+    #if selected_bank:
+    #    df = df[df['BANK_NAME'] == selected_bank]
+    all_banks = df['BANK_NAME'].unique().tolist()
+
+    if selected_bank:
+        df = df[df['BANK_NAME'] == selected_bank]
+        
+    year_cols = ['YEAR_2023', 'YEAR_2024', 'YEAR_2025']
+    def compute_diff_and_pct(row):
+        non_zero_years = [(col, row[col]) for col in year_cols if row[col] > 0]
+        if len(non_zero_years) >= 2:
+            prev_year, prev_val = non_zero_years[-2]
+            curr_year, curr_val = non_zero_years[-1]
+            diff = curr_val - prev_val
+            pct = (curr_val / prev_val * 100) if prev_val != 0 else 0
+        else:
+            diff = 0
+            pct = 0
+        return pd.Series([diff, pct], index=['DIFF', 'PCT_INC'])
+
+    df[['DIFF', 'PCT_INC']] = df.apply(compute_diff_and_pct, axis=1)
+    #
+    #all_banks = df['BANK_NAME'].unique().tolist()
+    #banks = df['BANK_NAME'].tolist()
+    #y2023 = df['YEAR_2023'].tolist()
+    #y2024 = df['YEAR_2024'].tolist()
+    #y2025 = df['YEAR_2025'].tolist()
+
+    # Helper to ensure safe float conversion
+    def safe_float(val):
+        try:
+            return float(val)
+        except:
+            return 0.0
+
+    banks = df['BANK_NAME'].tolist()
+    y2023 = [safe_float(v) for v in df['YEAR_2023']]
+    y2024 = [safe_float(v) for v in df['YEAR_2024']]
+    y2025 = [safe_float(v) for v in df['YEAR_2025']]
+        # Graph % increases
+    percent_23_to_24 = [(b - a) / a * 100 if a else 0 for a, b in zip(y2023, y2024)]
+    percent_24_to_25 = [(b - a) / a * 100 if a else 0 for a, b in zip(y2024, y2025)]
+
+    # Compute year-wise totals by SLA_CURRENCY
+    grouped = df.groupby('SLA_CURRENCY')[['YEAR_2023', 'YEAR_2024', 'YEAR_2025']].sum().reset_index()
+
+    currency_totals = grouped.to_dict(orient='records')
+
+    return render_template("dashboard.html",
+                           data=df.to_dict(orient='records'),
+                           banks=banks,
+                           y2023=y2023,
+                           y2024=y2024,
+                           y2025=y2025,
+                           percent_23_to_24=percent_23_to_24,
+                           percent_24_to_25=percent_24_to_25,
+                           all_banks=all_banks,
+                           selected_bank=selected_bank,
+                           role=session.get('role'),
+                           currency_totals=currency_totals)
+                           
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT PASSWORD, ROLE FROM USERS WHERE USERNAME = :username", {'username': username})
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if result and result[0] == password:
+            session['username'] = username
+            session['role'] = result[1]  # store role (admin/viewer)
+            return redirect('/')
+        else:
+            return render_template('login.html', error='Invalid credentials')
+
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
+
+  #  chart_labels = df['BANK_NAME'].tolist()
+  #  chart_data_2023 = df['YEAR_2023'].tolist()
+  #  chart_data_2024 = df['YEAR_2024'].tolist() if 'YEAR_2024' in df.columns else [0]*len(df)
+  #  chart_data_2025 = df['YEAR_2025'].tolist()
+  #  
+  #  all_banks = df['BANK_NAME'].unique().tolist()
+  #  
+  #  return render_template("dashboard.html",
+  #                         data=df.to_dict(orient='records'),
+  #                         chart_labels=chart_labels,
+  #                         chart_data_2023=chart_data_2023,
+  #                         chart_data_2024=chart_data_2024,
+  #                         chart_data_2025=chart_data_2025,
+  #                         all_banks=all_banks,
+  #                         selected_bank=selected_bank)
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    bank = request.form['bank']
+    period = request.form['period']
+    file = request.files['file']
+    now = datetime.now()
+
+    if file:
+        content = file.read()
+        filename = file.filename
+        mimetype = file.mimetype
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE SLA SET 
+                SLA_DOC = :blob, 
+                SLA_DOC_FILENAME = :filename,
+                SLA_DOC_TYPE = :type,
+                UPLOAD_DATE = :upload_date,
+                MODIFIED_DATE = :modified_date
+            WHERE BANK_NAME = :bank AND PERIOD = :period
+        """, {
+            'blob': content,
+            'filename': filename,
+            'type': mimetype,
+            'upload_date': now,
+            'modified_date': now,
+            'bank': bank,
+            'period': period
+        })
+        conn.commit()
+        cursor.close()
+        conn.close()
+    return redirect("/")
+
+@app.route("/download")
+def download_file():
+    bank = request.args.get('bank')
+    period = request.args.get('period')
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT SLA_DOC, SLA_DOC_FILENAME, SLA_DOC_TYPE
+            FROM SLA
+            WHERE BANK_NAME = :bank AND PERIOD = :period
+        """, {'bank': bank, 'period': period})
+
+        row = cursor.fetchone()
+        if row and row[0] is not None:
+            # ✅ Read LOB data immediately
+            blob_data = row[0].read()
+            filename = row[1]
+            filetype = row[2]
+            return send_file(io.BytesIO(blob_data), download_name=filename, mimetype=filetype)
+
+        return "File not found", 404
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.route("/delete", methods=["POST"])
+def delete_file():
+    bank = request.form['bank']
+    period = request.form['period']
+    now = datetime.now()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE SLA SET 
+            SLA_DOC = NULL, 
+            SLA_DOC_FILENAME = NULL, 
+            SLA_DOC_TYPE = NULL,
+            MODIFIED_DATE = :modified_date
+        WHERE BANK_NAME = :bank AND PERIOD = :period
+    """, {'bank': bank, 'period': period, 'modified_date': now})
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect("/")
+    
+@app.route("/update_field", methods=["POST"])
+def update_field():
+    if session.get("role") != "admin":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data = request.get_json()
+    bank = data['bank']
+    period = data['period']
+    field = data['field']
+    value = data['value']
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        sql = f"UPDATE SLA SET {field} = :value WHERE BANK_NAME = :bank AND PERIOD = :period"
+        cursor.execute(sql, {'value': value, 'bank': bank, 'period': period})
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+    finally:
+        cursor.close()
+        conn.close()
+
+if __name__ == "__main__":
+    #app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

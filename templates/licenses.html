@@ -1,0 +1,1391 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+  /* Mobile Responsive Styles for Licenses Page */
+  @media (max-width: 1024px) {
+    .container {
+      padding-left: 15px;
+      padding-right: 15px;
+    }
+    
+    .col-md-6, .col-md-4 {
+      margin-bottom: 15px;
+    }
+    
+    .card {
+      margin-bottom: 20px;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .container {
+      padding-left: 10px;
+      padding-right: 10px;
+      margin-top: 10px !important;
+    }
+    
+    .mb-4 {
+      margin-bottom: 15px !important;
+    }
+    
+    .form-label {
+      font-size: 12px !important;
+      margin-bottom: 5px !important;
+    }
+    
+    .form-select, .form-control {
+      font-size: 12px;
+      padding: 8px 10px;
+    }
+    
+    .card {
+      margin-bottom: 15px;
+    }
+    
+    .card-header {
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    
+    .card-body {
+      padding: 15px;
+    }
+    
+    .row.g-3 {
+      row-gap: 10px !important;
+    }
+    
+    .col-md-4, .col-md-6, .col-sm-6 {
+      width: 100% !important;
+      max-width: 100%;
+    }
+    
+    .btn {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    
+    .nav-tabs {
+      flex-wrap: wrap !important;
+    }
+    
+    .nav-tabs .nav-link {
+      padding: 8px 12px !important;
+      font-size: 11px !important;
+    }
+    
+    /* Table scrolling */
+    table {
+      font-size: 10px;
+    }
+    
+    table th {
+      padding: 8px 5px;
+      font-size: 9px;
+    }
+    
+    table td {
+      padding: 6px 4px;
+      font-size: 10px;
+    }
+    
+    /* Chart containers */
+    div[style*="col-md-6"] {
+      margin-bottom: 15px;
+    }
+    
+    canvas {
+      max-height: 180px !important;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .container {
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+    
+    .form-label {
+      font-size: 11px !important;
+    }
+    
+    .form-select, .form-control {
+      font-size: 11px;
+      padding: 6px 8px;
+    }
+    
+    .card-header {
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+    
+    .card-body {
+      padding: 10px;
+    }
+    
+    .btn {
+      padding: 6px 10px;
+      font-size: 10px;
+    }
+    
+    .nav-link {
+      padding: 6px 10px !important;
+      font-size: 10px !important;
+    }
+    
+    table {
+      font-size: 9px;
+      min-width: 1000px;
+      overflow-x: auto;
+    }
+    
+    table th {
+      padding: 6px 3px;
+      font-size: 8px;
+    }
+    
+    table td {
+      padding: 5px 3px;
+      font-size: 8px;
+    }
+    
+    h5 {
+      font-size: 12px !important;
+    }
+    
+    canvas {
+      max-height: 140px !important;
+    }
+  }
+
+  /* Dark Mode Table Visibility Fix */
+  html.dark-mode table tbody tr {
+    background-color: #2d2d2d !important;
+    color: #e0e0e0 !important;
+  }
+
+  html.dark-mode table tbody tr td {
+    color: #e0e0e0 !important;
+    border-color: #444444 !important;
+  }
+
+  html.dark-mode table tbody tr:nth-child(odd) {
+    background-color: #252525 !important;
+    color: #e0e0e0 !important;
+  }
+
+  html.dark-mode table tbody tr:hover {
+    background-color: #3a3a3a !important;
+    color: #f0f0f0 !important;
+  }
+
+  html.dark-mode .table {
+    color: #e0e0e0 !important;
+  }
+
+  html.dark-mode .table-bordered {
+    border-color: #444444 !important;
+  }
+
+  html.dark-mode .table-bordered > thead > tr > th,
+  html.dark-mode .table-bordered > tbody > tr > td {
+    border-color: #444444 !important;
+  }
+
+  /* Export Modal Styles */
+  .export-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.3s ease;
+  }
+
+  .export-modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .export-modal-content {
+    background-color: var(--bg-primary);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .export-modal-header {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent-color);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .export-modal-close {
+    position: absolute;
+    right: 20px;
+    top: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    color: var(--text-secondary);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  .export-modal-close:hover {
+    color: var(--accent-color);
+  }
+
+  .export-columns-section {
+    margin-bottom: 20px;
+  }
+
+  .export-columns-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-color);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  .export-column-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    background-color: var(--bg-secondary);
+    border-radius: 6px;
+  }
+
+  .export-column-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+  }
+
+  .export-column-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+  }
+
+  .export-column-item label {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+
+  .export-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+  }
+
+  .export-btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .export-btn-excel {
+    background-color: #10B981;
+    color: white;
+  }
+
+  .export-btn-excel:hover {
+    background-color: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+  }
+
+  .export-btn-pdf {
+    background-color: #EF4444;
+    color: white;
+  }
+
+  .export-btn-pdf:hover {
+    background-color: #DC2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+  }
+
+  .export-btn-cancel {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .export-btn-cancel:hover {
+    background-color: var(--bg-tertiary);
+  }
+
+  @media (max-width: 768px) {
+    .export-modal-content {
+      width: 95%;
+      padding: 20px;
+    }
+    
+    .export-modal-header {
+      font-size: 16px;
+    }
+    
+    .export-buttons {
+      flex-direction: column;
+    }
+  }
+</style>
+
+<div class="container mt-4">
+
+  <!-- 🔹 Client Filter -->
+  <div class="mb-4">
+    <label for="clientFilter" class="form-label fw-bold">Filter by Client</label>
+    <select id="clientFilter" class="form-select">
+      <option value="">All Clients</option>
+      {% for c in clients %}
+        <option value="{{ c }}" {% if c == selected_client %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- 🔹 Add RDV License -->
+  {% if role == "admin" %}
+  <div class="card mb-4 shadow">
+    <div class="card-header bg-dark text-white">Add RDV License</div>
+    <div class="card-body">
+      <form id="addRdvForm" class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Client Name</label>
+          <input type="text" class="form-control" name="CLIENT_NAME"
+                 value="{{ selected_client if selected_client else '' }}"
+                 {% if selected_client %} readonly {% endif %} required>
+        </div>
+        <div class="col-md-4"><label class="form-label">License GUID</label><input type="text" class="form-control" name="LICENSE_GUID"></div>
+        <div class="col-md-4"><label class="form-label">Max Networks</label><input type="text" class="form-control" name="MAXNETWORKS"></div>
+        <div class="col-md-4"><label class="form-label">Max Adapters</label><input type="text" class="form-control" name="MAXADAPTERS"></div>
+        <div class="col-md-4"><label class="form-label">MTS_MPS</label><input type="text" class="form-control" name="MTS_MPS"></div>
+        <div class="col-md-4"><label class="form-label">TP</label><input type="text" class="form-control" name="TP"></div>
+        <div class="col-md-4"><label class="form-label">TCPIP</label><input type="text" class="form-control" name="TCPIP"></div>
+        <div class="col-md-4"><label class="form-label">Sybase</label><input type="text" class="form-control" name="SYBASE"></div>
+        <div class="col-md-4"><label class="form-label">Web Service</label><input type="text" class="form-control" name="WEBSERVICE"></div>
+        <div class="col-md-4"><label class="form-label">MSMQ</label><input type="text" class="form-control" name="MSMQ"></div>
+        <div class="col-md-4"><label class="form-label">MQ Series</label><input type="text" class="form-control" name="MQSERIES"></div>
+        <div class="col-md-4"><label class="form-label">Status</label><input type="text" class="form-control" name="STATUS"></div>
+        <div class="col-12"><button type="submit" class="btn btn-primary">Add RDV License</button></div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 🔹 Add Nimbus License -->
+  {% if role == "admin" %}
+  <div class="card mb-4 shadow">
+    <div class="card-header bg-dark text-white">Add Nimbus License</div>
+    <div class="card-body">
+      <form id="addNimbusForm" class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Client Name</label>
+          <input type="text" class="form-control" name="CLIENT_NAME"
+                 value="{{ selected_client if selected_client else '' }}"
+                 {% if selected_client %} readonly {% endif %} required>
+        </div>
+        <div class="col-md-6"><label class="form-label">License GUID</label><input type="text" class="form-control" name="LICENSE_GUID"></div>
+        <div class="col-md-6"><label class="form-label">Max Terminals</label><input type="text" class="form-control" name="MAXTERMINALS"></div>
+        <div class="col-12"><button type="submit" class="btn btn-primary">Add Nimbus License</button></div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 🔹 Add Unison License -->
+  {% if role == "admin" %}
+  <div class="card mb-4 shadow">
+    <div class="card-header bg-dark text-white">Add Unison License</div>
+    <div class="card-body">
+      <form id="addUnisonForm" class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Client Name</label>
+          <input type="text" class="form-control" name="CLIENT_NAME"
+                 value="{{ selected_client if selected_client else '' }}"
+                 {% if selected_client %} readonly {% endif %} required>
+        </div>
+        <div class="col-md-6"><label class="form-label">License GUID</label><input type="text" class="form-control" name="LICENSE_GUID"></div>
+        <div class="col-md-6"><label class="form-label">Max Agent Seats</label><input type="text" class="form-control" name="MAXAGENTSSEATS"></div>
+        <div class="col-12"><button type="submit" class="btn btn-primary">Add Unison License</button></div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+
+  <!-- 🔹 Tab Navigation for License Data Only -->
+  <ul class="nav nav-tabs" style="margin-top: 30px; border-bottom: 2px solid var(--accent-color);">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#dataTab" style="color: var(--text-primary);">📋 LICENSE DATA</a></li>
+  </ul>
+
+  <div class="tab-content mt-3">
+    <!-- � LICENSE DATA Tab -->
+    <div class="tab-pane fade show active" id="dataTab">
+      <ul class="nav nav-tabs mt-3" id="licenseTabs">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#rdvTab" style="color: var(--text-primary);">RDV</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#nimbusTab" style="color: var(--text-primary);">Nimbus</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#unisonTab" style="color: var(--text-primary);">Unison</a></li>
+        {% if role == "admin" %}
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#logTab" style="color: var(--text-primary);">Edit Log</a></li>
+        {% endif %}
+      </ul>
+
+      <div class="tab-content mt-3">
+        <!-- RDV Tab -->
+        <div class="tab-pane fade show active" id="rdvTab">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h5>RDV Licenses</h5>
+            <button onclick="openExportModal('rdvTable')" style="padding: 8px 14px; background-color: #10B981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">📥 Export</button>
+          </div>
+          <div style="overflow-x: auto; max-height: 500px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px;">
+          <table class="table table-striped table-bordered shadow-sm" id="rdvTable" style="background-color: var(--bg-primary); color: var(--text-primary);">
+            <thead class="table-dark" style="background-color: var(--accent-color); color: white; position: sticky; top: 0; z-index: 10;">
+              <tr>
+                <th>Client</th>
+                <th>License GUID</th>
+                <th>Max Networks</th>
+                <th>Max Adapters</th>
+                <th>MTS_MPS</th>
+                <th>TP</th>
+                <th>TCPIP</th>
+                <th>Sybase</th>
+                <th>Web Service</th>
+                <th>MSMQ</th>
+                <th>MQSeries</th>
+                <th>Status</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% set editable = 'true' if role == 'admin' else 'false' %}
+              {% for r in rdv %}
+              <tr data-id="{{ r.ID }}" data-table="RDV_LICENSES" style="background-color: var(--bg-primary); color: var(--text-primary);">
+                <td contenteditable="{{ editable }}" data-field="CLIENT_NAME">{{ r.CLIENT_NAME }}</td>
+                <td contenteditable="{{ editable }}" data-field="LICENSE_GUID">{{ r.LICENSE_GUID }}</td>
+                <td contenteditable="{{ editable }}" data-field="MAXNETWORKS">{{ r.MAXNETWORKS }}</td>
+                <td contenteditable="{{ editable }}" data-field="MAXADAPTERS">{{ r.MAXADAPTERS }}</td>
+                <td contenteditable="{{ editable }}" data-field="MTS_MPS">{{ r.MTS_MPS }}</td>
+                <td contenteditable="{{ editable }}" data-field="TP">{{ r.TP }}</td>
+                <td contenteditable="{{ editable }}" data-field="TCPIP">{{ r.TCPIP }}</td>
+                <td contenteditable="{{ editable }}" data-field="SYBASE">{{ r.SYBASE }}</td>
+                <td contenteditable="{{ editable }}" data-field="WEBSERVICE">{{ r.WEBSERVICE }}</td>
+                <td contenteditable="{{ editable }}" data-field="MSMQ">{{ r.MSMQ }}</td>
+                <td contenteditable="{{ editable }}" data-field="MQSERIES">{{ r.MQSERIES }}</td>
+                <td contenteditable="{{ editable }}" data-field="STATUS">{{ r.STATUS }}</td>
+                <td>{{ r.LAST_UPDATED }}</td>
+                <td>{% if role == "admin" %}<button type="button" class="btn btn-sm btn-success update-btn">Update</button>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+        </div>
+
+        <!-- Nimbus Tab -->
+        <div class="tab-pane fade" id="nimbusTab">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h5>Nimbus Licenses</h5>
+            <button onclick="openExportModal('nimbusTable')" style="padding: 8px 14px; background-color: #10B981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">📥 Export</button>
+          </div>
+          <div style="overflow-x: auto; max-height: 500px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px;">
+          <table class="table table-striped table-bordered shadow-sm" id="nimbusTable" style="background-color: var(--bg-primary); color: var(--text-primary);">
+            <thead class="table-dark" style="background-color: var(--accent-color); color: white; position: sticky; top: 0; z-index: 10;">
+              <tr>
+                <th>Client</th>
+                <th>License GUID</th>
+                <th>Max Terminals</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for n in nimbus %}
+              <tr data-id="{{ n.ID }}" data-table="NIMBUS_LICENSES" style="background-color: var(--bg-primary); color: var(--text-primary);">
+                <td contenteditable="{{ editable }}" data-field="CLIENT_NAME">{{ n.CLIENT_NAME }}</td>
+                <td contenteditable="{{ editable }}" data-field="LICENSE_GUID">{{ n.LICENSE_GUID }}</td>
+                <td contenteditable="{{ editable }}" data-field="MAXTERMINALS">{{ n.MAXTERMINALS }}</td>
+                <td>{{ n.LAST_UPDATED }}</td>
+                <td>{% if role == "admin" %}<button type="button" class="btn btn-sm btn-success update-btn">Update</button>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+        </div>
+
+        <!-- Unison Tab -->
+        <div class="tab-pane fade" id="unisonTab">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h5>Unison Licenses</h5>
+            <button onclick="openExportModal('unisonTable')" style="padding: 8px 14px; background-color: #10B981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">📥 Export</button>
+          </div>
+          <div style="overflow-x: auto; max-height: 500px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px;">
+          <table class="table table-striped table-bordered shadow-sm" id="unisonTable" style="background-color: var(--bg-primary); color: var(--text-primary);">
+            <thead class="table-dark" style="background-color: var(--accent-color); color: white; position: sticky; top: 0; z-index: 10;">
+              <tr>
+                <th>Client</th>
+                <th>License GUID</th>
+                <th>Max Agent Seats</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for u in unison %}
+              <tr data-id="{{ u.ID }}" data-table="UNISON_LICENSES" style="background-color: var(--bg-primary); color: var(--text-primary);">
+                <td contenteditable="{{ editable }}" data-field="CLIENT_NAME">{{ u.CLIENT_NAME }}</td>
+                <td contenteditable="{{ editable }}" data-field="LICENSE_GUID">{{ u.LICENSE_GUID }}</td>
+                <td contenteditable="{{ editable }}" data-field="MAXAGENTSSEATS">{{ u.MAXAGENTSSEATS }}</td>
+                <td>{{ u.LAST_UPDATED }}</td>
+                <td>{% if role == "admin" %}<button type="button" class="btn btn-sm btn-success update-btn">Update</button>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+        </div>
+
+        <!-- Edit Log Tab -->
+        {% if role == "admin" %}
+        <div class="tab-pane fade" id="logTab">
+          <div style="margin-bottom: 15px;">
+            <button class="btn btn-sm" onclick="filterLog('ALL')" id="filterAll" style="background-color: var(--bg-secondary); color: var(--text-primary);">All Changes</button>
+            <button class="btn btn-sm" onclick="filterLog('RDV_LICENSES')" id="filterRDV" style="background-color: var(--bg-secondary); color: var(--text-primary);">RDV Changes Only</button>
+            <button class="btn btn-sm" onclick="filterLog('NIMBUS_LICENSES')" id="filterNimbus" style="background-color: var(--bg-secondary); color: var(--text-primary);">Nimbus Changes Only</button>
+            <button class="btn btn-sm" onclick="filterLog('UNISON_LICENSES')" id="filterUnison" style="background-color: var(--bg-secondary); color: var(--text-primary);">Unison Changes Only</button>
+          </div>
+          <div style="overflow-x: auto; max-height: 500px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px;">
+          <table class="table table-striped table-bordered shadow-sm" id="editLogTable" style="background-color: var(--bg-primary); color: var(--text-primary);">
+            <thead class="table-dark" style="background-color: var(--accent-color); color: white; position: sticky; top: 0; z-index: 10;">
+              <tr>
+                <th>Table</th>
+                <th>Client</th>
+                <th>Field</th>
+                <th>Old Value</th>
+                <th>New Value</th>
+                <th>Changed By</th>
+                <th>Change Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in logs %}
+              <tr data-table="{{ log.TABLE_NAME }}" style="background-color: var(--bg-primary); color: var(--text-primary);">
+                <td>{{ log.TABLE_NAME }}</td>
+                <td>{{ log.CLIENT_NAME }}</td>
+                <td>{{ log.FIELD_NAME }}</td>
+                <td>{{ log.OLD_VALUE }}</td>
+                <td>{{ log.NEW_VALUE }}</td>
+                <td>{{ log.CHANGED_BY }}</td>
+                <td>{{ log.CHANGE_TIME|string|truncate(19, True, '') }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+
+
+<!-- 🔹 Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function () {
+    console.log("✅ licenses.js loaded");
+
+    // 🔹 Filter change
+    $("#clientFilter").change(function(){
+        let client = $(this).val();
+        if(client){
+            window.location = "/licenses?client=" + encodeURIComponent(client);
+        } else {
+            window.location = "/licenses";
+        }
+    });
+	
+// RDV License Form
+    $("#addRdvForm").on("submit", function(e) {
+        e.preventDefault();
+        console.log("➡️ Submitting RDV form...");
+
+        let formData = {};
+        $(this).serializeArray().forEach(x => formData[x.name] = x.value);
+        console.log("FormData RDV:", formData);
+
+        $.ajax({
+            url: "/add_rdv_license",
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify(formData),
+            success: function (res) {
+                console.log("✅ RDV Insert Response:", res);
+                if(res.error){ alert(res.error); return; }
+
+                $("#rdvTable tbody").append(`
+                    <tr data-id="${res.ID}">
+                        <td>${res.CLIENT_NAME}</td>
+                        <td>${res.LICENSE_GUID}</td>
+                        <td>${res.MAXNETWORKS}</td>
+                        <td>${res.MAXADAPTERS}</td>
+                        <td>${res.MTS_MPS}</td>
+                        <td>${res.TP}</td>
+                        <td>${res.TCPIP}</td>
+                        <td>${res.SYBASE}</td>
+                        <td>${res.WEBSERVICE}</td>
+                        <td>${res.MSMQ}</td>
+                        <td>${res.MQSERIES}</td>
+                        <td>${res.STATUS}</td>
+                        <td class="last-updated">${res.LAST_UPDATED}</td>
+                    </tr>
+                `);
+
+                addClientToDropdown(res.CLIENT_NAME);
+                $("#addRdvForm")[0].reset();
+            },
+            error: function(xhr){
+                console.error("❌ RDV Insert Error:", xhr.responseText);
+                alert("Error: " + xhr.responseText);
+            }
+        });
+    });
+	
+    // Nimbus License Form
+    $("#addNimbusForm").on("submit", function(e) {
+        e.preventDefault();
+        console.log("➡️ Submitting Nimbus form...");
+
+        let formData = {};
+        $(this).serializeArray().forEach(x => formData[x.name] = x.value);
+        console.log("FormData Nimbus:", formData);
+
+        $.ajax({
+            url: "/add_nimbus_license",
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify(formData),
+            success: function (res) {
+                console.log("✅ Nimbus Insert Response:", res);
+                if(res.error){ alert(res.error); return; }
+
+                $("#nimbusTable tbody").append(`
+                    <tr data-id="${res.ID}">
+                        <td>${res.CLIENT_NAME}</td>
+                        <td>${res.LICENSE_GUID}</td>
+                        <td>${res.MAXTERMINALS}</td>
+                        <td class="last-updated">${res.LAST_UPDATED}</td>
+                    </tr>
+                `);
+
+                addClientToDropdown(res.CLIENT_NAME);
+                $("#addNimbusForm")[0].reset();
+            },
+            error: function(xhr){
+                console.error("❌ Nimbus Insert Error:", xhr.responseText);
+                alert("Error: " + xhr.responseText);
+            }
+        });
+    });
+
+    // Unison License Form
+    $("#addUnisonForm").on("submit", function(e) {
+        e.preventDefault();
+        console.log("➡️ Submitting Unison form...");
+
+        let formData = {};
+        $(this).serializeArray().forEach(x => formData[x.name] = x.value);
+        console.log("FormData Unison:", formData);
+
+        $.ajax({
+            url: "/add_unison_license",
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify(formData),
+            success: function (res) {
+                console.log("✅ Unison Insert Response:", res);
+                if(res.error){ alert(res.error); return; }
+
+                $("#unisonTable tbody").append(`
+                    <tr data-id="${res.ID}">
+                        <td>${res.CLIENT_NAME}</td>
+                        <td>${res.LICENSE_GUID}</td>
+                        <td>${res.MAXAGENTSSEATS}</td>
+                        <td class="last-updated">${res.LAST_UPDATED}</td>
+                    </tr>
+                `);
+
+                addClientToDropdown(res.CLIENT_NAME);
+                $("#addUnisonForm")[0].reset();
+            },
+            error: function(xhr){
+                console.error("❌ Unison Insert Error:", xhr.responseText);
+                alert("Error: " + xhr.responseText);
+            }
+        });
+    });
+
+    // 🔹 Mark cell as edited
+    $("#rdvTable, #nimbusTable, #unisonTable").on("input","td[contenteditable=true]",function(){
+        let tr = $(this).closest("tr");
+        tr.find(".update-btn").removeClass("d-none"); // show button
+        $(this).addClass("edited");
+    });
+
+    // 🔹 Save when clicking Update
+$(document).on("click", ".update-btn", function(e) {
+    e.preventDefault();   // ✅ stop any default navigation
+    e.stopPropagation();  // ✅ stop bubbling (avoid form submission)
+
+    let tr = $(this).closest("tr");
+    let id = tr.data("id");
+    let tableId = tr.closest("table").attr("id");
+    let table;
+    if (tableId === "rdvTable") table = "RDV_LICENSES";
+    else if (tableId === "nimbusTable") table = "NIMBUS_LICENSES";
+    else if (tableId === "unisonTable") table = "UNISON_LICENSES";
+
+    // Collect all edited fields in this row
+    let updates = [];
+    tr.find("td.edited").each(function() {
+        updates.push({
+            field: $(this).data("field"),
+            value: $(this).text().trim()
+        });
+    });
+
+    if (updates.length === 0) {
+        alert("No changes to save");
+        return;
+    }
+
+    console.log("➡️ Sending batched update:", {id, table, updates});
+
+    $.ajax({
+        url: "/update_license",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({id: id, table: table, updates: updates}),
+        success: function(res) {
+            console.log("✅ Update success:", res);
+            tr.find("td.edited").removeClass("edited");
+            tr.find(".last-updated").text(res.LAST_UPDATED);
+            tr.find(".update-btn").remove();
+        },
+        error: function(xhr) {
+            console.error("❌ Update failed:", xhr.responseText);
+            alert("Update failed: " + xhr.responseText);
+        }
+		});
+	});
+});
+
+// 🔹 Filter Edit Log by table type
+function filterLog(tableType) {
+    console.log("🔹 Filtering Edit Log by:", tableType);
+    
+    // Update button styles
+    $("#filterAll, #filterRDV, #filterNimbus").removeClass("btn-info").addClass("btn-secondary");
+    
+    if(tableType === "ALL") {
+        $("#filterAll").removeClass("btn-secondary").addClass("btn-info");
+        $("#editLogTable tbody tr").show();
+    } else if(tableType === "RDV_LICENSES") {
+        $("#filterRDV").removeClass("btn-secondary").addClass("btn-info");
+        $("#editLogTable tbody tr").hide();
+        $("#editLogTable tbody tr[data-table='RDV_LICENSES']").show();
+    } else if(tableType === "NIMBUS_LICENSES") {
+        $("#filterNimbus").removeClass("btn-secondary").addClass("btn-info");
+        $("#editLogTable tbody tr").hide();
+        $("#editLogTable tbody tr[data-table='NIMBUS_LICENSES']").show();
+    }
+}
+
+// 🔹 Load and render charts
+async function loadLicenseCharts() {
+    try {
+        // Wait for Chart.js to be available
+        let attempts = 0;
+        while (typeof Chart === 'undefined' && attempts < 50) {
+            await new Promise(r => setTimeout(r, 100));
+            attempts++;
+        }
+        
+        if (typeof Chart === 'undefined') {
+            console.error("❌ Chart.js library not loaded");
+            return;
+        }
+        
+        const response = await fetch('/api/license-usage-data');
+        const data = await response.json();
+        console.log("📊 License data:", data);
+        
+        const isDarkMode = document.documentElement.classList.contains('dark-mode');
+        const textColor = isDarkMode ? '#ffffff' : '#7B2D7F';
+        const gridColor = isDarkMode ? '#444444' : '#e0e0e0';
+        const accentColor = isDarkMode ? '#BB86FC' : '#4B0082';
+        
+        // RDV Status Chart
+        if (data.rdv_status && data.rdv_status.length > 0) {
+            const rdvCtx = document.getElementById('rdvStatusChart');
+            if (rdvCtx) {
+                const rdvLabels = data.rdv_status.map(d => d.STATUS || 'Unknown');
+                const rdvValues = data.rdv_status.map(d => d.count || 0);
+                try {
+                    if (window.rdvStatusChart && typeof window.rdvStatusChart.destroy === 'function') {
+                        window.rdvStatusChart.destroy();
+                    }
+                } catch(e) {}
+                window.rdvStatusChart = new Chart(rdvCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: rdvLabels,
+                        datasets: [{
+                            data: rdvValues,
+                            backgroundColor: ['#2196F3', '#FF5722', '#9C27B0'],
+                            borderColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+                            borderWidth: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: textColor, font: { size: 12, weight: '600' } } },
+                            tooltip: { backgroundColor: isDarkMode ? '#2d2d2d' : '#ffffff', titleColor: textColor, bodyColor: textColor, borderColor: gridColor, borderWidth: 1 }
+                        }
+                    }
+                });
+                console.log("✅ RDV Status Chart rendered");
+            }
+        }
+        
+        // Nimbus Status Chart
+        if (data.nimbus_status && data.nimbus_status.length > 0) {
+            const nimbusCtx = document.getElementById('nimbusStatusChart');
+            if (nimbusCtx) {
+                const nimbusLabels = data.nimbus_status.map(d => d.STATUS || 'Unknown');
+                const nimbusValues = data.nimbus_status.map(d => d.count || 0);
+                try {
+                    if (window.nimbusStatusChart && typeof window.nimbusStatusChart.destroy === 'function') {
+                        window.nimbusStatusChart.destroy();
+                    }
+                } catch(e) {}
+                window.nimbusStatusChart = new Chart(nimbusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: nimbusLabels,
+                        datasets: [{
+                            data: nimbusValues,
+                            backgroundColor: ['#2196F3', '#FF5722', '#9C27B0'],
+                            borderColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+                            borderWidth: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: textColor, font: { size: 12, weight: '600' } } },
+                            tooltip: { backgroundColor: isDarkMode ? '#2d2d2d' : '#ffffff', titleColor: textColor, bodyColor: textColor, borderColor: gridColor, borderWidth: 1 }
+                        }
+                    }
+                });
+                console.log("✅ Nimbus Status Chart rendered");
+            }
+        }
+
+        // Unison Status Chart (show even if empty)
+        const unisonCtx = document.getElementById('unisonStatusChart');
+        if (unisonCtx) {
+            const unisonLabels = (data.unison_status && data.unison_status.length > 0) 
+                ? data.unison_status.map(d => d.STATUS || 'Unknown')
+                : ['No Data'];
+            const unisonValues = (data.unison_status && data.unison_status.length > 0)
+                ? data.unison_status.map(d => d.count || 0)
+                : [0];
+            try {
+                if (window.unisonStatusChart && typeof window.unisonStatusChart.destroy === 'function') {
+                    window.unisonStatusChart.destroy();
+                }
+            } catch(e) {}
+            window.unisonStatusChart = new Chart(unisonCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: unisonLabels,
+                    datasets: [{
+                        data: unisonValues,
+                        backgroundColor: ['#FF5722', '#2196F3', '#9C27B0'],
+                        borderColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: textColor, font: { size: 12, weight: '600' } } },
+                        tooltip: { backgroundColor: isDarkMode ? '#2d2d2d' : '#ffffff', titleColor: textColor, bodyColor: textColor, borderColor: gridColor, borderWidth: 1 }
+                    }
+                }
+            });
+            console.log("✅ Unison Status Chart rendered");
+        }
+        
+        // License Distribution Chart
+        if (data.license_type_distribution && data.license_type_distribution.length > 0) {
+            const distCtx = document.getElementById('licenseDistributionChart');
+            if (distCtx) {
+                const distLabels = data.license_type_distribution.map(d => d.type || 'Unknown');
+                const distValues = data.license_type_distribution.map(d => d.count || 0);
+                try {
+                    if (window.licenseDistChart && typeof window.licenseDistChart.destroy === 'function') {
+                        window.licenseDistChart.destroy();
+                    }
+                } catch(e) {}
+                window.licenseDistChart = new Chart(distCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: distLabels,
+                        datasets: [{
+                            data: distValues,
+                            backgroundColor: ['#2196F3', '#9C27B0', '#FF5722'],
+                            borderColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+                            borderWidth: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: textColor, font: { size: 12, weight: '600' } } },
+                            tooltip: { backgroundColor: isDarkMode ? '#2d2d2d' : '#ffffff', titleColor: textColor, bodyColor: textColor, borderColor: gridColor, borderWidth: 1 }
+                        }
+                    }
+                });
+                console.log("✅ Distribution Chart rendered");
+            }
+        }
+        
+        // Features Chart
+        if (data.features_usage && Object.keys(data.features_usage).length > 0) {
+            const featCtx = document.getElementById('featuresChart');
+            if (featCtx) {
+                const featLabels = Object.keys(data.features_usage);
+                const featValues = Object.values(data.features_usage);
+                try {
+                    if (window.featuresChart && typeof window.featuresChart.destroy === 'function') {
+                        window.featuresChart.destroy();
+                    }
+                } catch(e) {}
+                window.featuresChart = new Chart(featCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: featLabels,
+                        datasets: [{
+                            label: 'Usage Count',
+                            data: featValues,
+                            backgroundColor: '#FF6B6B',
+                            borderColor: '#FF0000',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false, labels: { color: textColor } },
+                            tooltip: { backgroundColor: isDarkMode ? '#2d2d2d' : '#ffffff', titleColor: textColor, bodyColor: textColor, borderColor: gridColor, borderWidth: 1 }
+                        },
+                        scales: {
+                            x: { 
+                                ticks: { color: textColor }, 
+                                grid: { color: gridColor },
+                                min: 0,
+                                max: Math.max(1, Math.max(...featValues))
+                            },
+                            y: { 
+                                beginAtZero: true,
+                                ticks: { color: textColor }, 
+                                grid: { color: gridColor }
+                            }
+                        }
+                    }
+                });
+                console.log("✅ Features Chart rendered");
+            }
+        }
+    } catch (error) {
+        console.error("❌ Error loading license charts:", error);
+    }
+}
+
+// 🔹 Load charts on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Delay to ensure all libraries are loaded
+    setTimeout(loadLicenseCharts, 500);
+});
+
+// 🔹 Listen for theme toggle
+document.addEventListener('themeToggled', loadLicenseCharts);
+
+// Export Feature Functions
+let currentExportTableId = '';
+let currentExportData = [];
+let currentExportColumns = [];
+
+function cleanText(text) {
+  if (!text) return '';
+  // Convert to string and remove all non-printable characters
+  let cleaned = String(text)
+    .replace(/[^\x20-\x7E\n\r]/g, '') // Keep only ASCII printable chars
+    .replace(/\s+/g, ' ') // Collapse whitespace
+    .trim();
+  return cleaned.substring(0, 150); // Limit length
+}
+
+function openExportModal(tableId) {
+  currentExportTableId = tableId;
+  
+  // Get table and extract columns
+  let table;
+  let allColumns = [];
+  
+  if (tableId === 'rdvTable') {
+    table = document.getElementById('rdvTable');
+    if (!table) {
+      alert('RDV Table not found!');
+      return;
+    }
+    
+    const headers = Array.from(table.querySelectorAll('th'));
+    allColumns = headers.map((th, idx) => ({
+      id: 'col' + idx,
+      name: cleanText(th.textContent),
+      checked: true,
+      element: th
+    }));
+    
+    // Extract all rows data with proper cleaning
+    // Handle select dropdowns to get only selected value
+    const rows = table.querySelectorAll('tbody tr');
+    currentExportData = Array.from(rows).map(row => {
+      const cells = Array.from(row.querySelectorAll('td'));
+      return cells.map(cell => {
+        // Check if cell contains a select dropdown
+        const selectElement = cell.querySelector('select');
+        if (selectElement) {
+          // Get the selected option's text or value
+          const selectedOption = selectElement.options[selectElement.selectedIndex];
+          return cleanText(selectedOption.text || selectedOption.value);
+        } else {
+          // For regular cells, get the text content
+          return cleanText(cell.textContent);
+        }
+      });
+    });
+  } else if (tableId === 'nimbusTable') {
+    table = document.getElementById('nimbusTable');
+    if (!table) {
+      alert('Nimbus Table not found!');
+      return;
+    }
+    
+    const headers = Array.from(table.querySelectorAll('th'));
+    allColumns = headers.map((th, idx) => ({
+      id: 'col' + idx,
+      name: cleanText(th.textContent),
+      checked: true,
+      element: th
+    }));
+    
+    // Extract all rows data with proper cleaning
+    // Handle select dropdowns to get only selected value
+    const rows = table.querySelectorAll('tbody tr');
+    currentExportData = Array.from(rows).map(row => {
+      const cells = Array.from(row.querySelectorAll('td'));
+      return cells.map(cell => {
+        // Check if cell contains a select dropdown
+        const selectElement = cell.querySelector('select');
+        if (selectElement) {
+          // Get the selected option's text or value
+          const selectedOption = selectElement.options[selectElement.selectedIndex];
+          return cleanText(selectedOption.text || selectedOption.value);
+        } else {
+          // For regular cells, get the text content
+          return cleanText(cell.textContent);
+        }
+      });
+    });
+  } else if (tableId === 'unisonTable') {
+    table = document.getElementById('unisonTable');
+    if (!table) {
+      alert('Unison Table not found!');
+      return;
+    }
+    
+    const headers = Array.from(table.querySelectorAll('th'));
+    allColumns = headers.map((th, idx) => ({
+      id: 'col' + idx,
+      name: cleanText(th.textContent),
+      checked: true,
+      element: th
+    }));
+    
+    // Extract all rows data with proper cleaning
+    // Handle select dropdowns to get only selected value
+    const rows = table.querySelectorAll('tbody tr');
+    currentExportData = Array.from(rows).map(row => {
+      const cells = Array.from(row.querySelectorAll('td'));
+      return cells.map(cell => {
+        // Check if cell contains a select dropdown
+        const selectElement = cell.querySelector('select');
+        if (selectElement) {
+          // Get the selected option's text or value
+          const selectedOption = selectElement.options[selectElement.selectedIndex];
+          return cleanText(selectedOption.text || selectedOption.value);
+        } else {
+          // For regular cells, get the text content
+          return cleanText(cell.textContent);
+        }
+      });
+    });
+  }
+  
+  currentExportColumns = allColumns;
+  populateExportColumns();
+  const modal = document.getElementById('exportModal');
+  if (modal) {
+    modal.classList.add('active');
+  }
+}
+
+function populateExportColumns() {
+  const listContainer = document.getElementById('exportColumnList');
+  listContainer.innerHTML = '';
+  
+  currentExportColumns.forEach((col, idx) => {
+    const item = document.createElement('div');
+    item.className = 'export-column-item';
+    item.innerHTML = `
+      <input type="checkbox" id="col${idx}" checked onchange="updateColumnSelection(${idx})">
+      <label for="col${idx}">${col.name}</label>
+    `;
+    listContainer.appendChild(item);
+  });
+}
+
+function updateColumnSelection(idx) {
+  const checkbox = document.getElementById('col' + idx);
+  currentExportColumns[idx].checked = checkbox.checked;
+}
+
+function closeExportModal() {
+  document.getElementById('exportModal').classList.remove('active');
+}
+
+function getSelectedColumns() {
+  return currentExportColumns.filter(col => col.checked);
+}
+
+function exportToExcel() {
+  try {
+    const selectedCols = getSelectedColumns();
+    const selectedIndices = currentExportColumns
+      .map((col, idx) => col.checked ? idx : -1)
+      .filter(idx => idx !== -1);
+    
+    if (currentExportData.length === 0) {
+      alert('No data to export!');
+      return;
+    }
+    
+    // Collect selected columns headers
+    const columnHeaders = selectedCols.map(col => col.name);
+    
+    // Collect selected data
+    const exportData = currentExportData.map(row =>
+      selectedIndices.map(idx => row[idx] || '')
+    );
+    
+    const tableType = currentExportTableId === 'rdvTable' ? 'rdv' : 
+                       currentExportTableId === 'nimbusTable' ? 'nimbus' : 'unison';
+    console.log('Exporting to Excel:', columnHeaders, exportData);
+    
+    // Send to server for export
+    fetch('/api/export-licenses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        format: 'xlsx',
+        table_type: tableType,
+        columns: columnHeaders,
+        data: exportData
+      })
+    })
+    .then(response => {
+      if (!response.ok) throw new Error('Export failed');
+      return response.blob();
+    })
+    .then(blob => {
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = tableType === 'rdv' ? 'RDV_Licenses' : 
+                       tableType === 'nimbus' ? 'Nimbus_Licenses' : 'Unison_Licenses';
+      a.download = `${fileName}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      console.log('Excel export successful');
+      closeExportModal();
+    })
+    .catch(error => {
+      console.error('Export error:', error);
+      alert('Error exporting to Excel: ' + error.message);
+    });
+  } catch (error) {
+    console.error('Export setup error:', error);
+    alert('Error preparing export: ' + error.message);
+  }
+}
+
+function cleanCellText(text) {
+  // Remove extra whitespace, line breaks, and special characters
+  return String(text).replace(/\s+/g, ' ').trim().substring(0, 100);
+}
+
+function exportToPDF() {
+  try {
+    const selectedCols = getSelectedColumns();
+    const selectedIndices = currentExportColumns
+      .map((col, idx) => col.checked ? idx : -1)
+      .filter(idx => idx !== -1);
+    
+    if (currentExportData.length === 0) {
+      alert('No data to export!');
+      return;
+    }
+    
+    // Collect selected columns headers
+    const columnHeaders = selectedCols.map(col => col.name);
+    
+    // Collect selected data
+    const exportData = currentExportData.map(row =>
+      selectedIndices.map(idx => row[idx] || '')
+    );
+    
+    const tableType = currentExportTableId === 'rdvTable' ? 'rdv' : 
+                       currentExportTableId === 'nimbusTable' ? 'nimbus' : 'unison';
+    const tableName = tableType === 'rdv' ? 'RDV Licenses' : 
+                       tableType === 'nimbus' ? 'Nimbus Licenses' : 'Unison Licenses';
+    console.log('Exporting to PDF:', columnHeaders, exportData);
+    
+    // Send to server for export
+    fetch('/api/export-licenses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        format: 'pdf',
+        table_type: tableType,
+        columns: columnHeaders,
+        data: exportData
+      })
+    })
+    .then(response => {
+      if (!response.ok) throw new Error('Export failed');
+      return response.blob();
+    })
+    .then(blob => {
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = tableType === 'rdv' ? 'RDV_Licenses' : 
+                       tableType === 'nimbus' ? 'Nimbus_Licenses' : 'Unison_Licenses';
+      a.download = `${fileName}_${new Date().toISOString().slice(0,10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      console.log('PDF export successful');
+      closeExportModal();
+    })
+    .catch(error => {
+      console.error('Export error:', error);
+      alert('Error exporting to PDF: ' + error.message);
+    });
+  } catch (error) {
+    console.error('Export setup error:', error);
+    alert('Error preparing export: ' + error.message);
+  }
+}
+
+// Close modal when clicking outside
+window.addEventListener('click', function(event) {
+  const modal = document.getElementById('exportModal');
+  if (modal && event.target === modal) {
+    closeExportModal();
+  }
+});
+</script>
+
+<!-- Export Modal -->
+<div class="export-modal" id="exportModal">
+  <div class="export-modal-content">
+    <button class="export-modal-close" onclick="closeExportModal()">×</button>
+    <div class="export-modal-header">📊 Select Columns to Export</div>
+    
+    <div class="export-columns-section">
+      <div class="export-columns-title">Available Columns</div>
+      <div class="export-column-list" id="exportColumnList"></div>
+    </div>
+    
+    <div class="export-buttons">
+      <button class="export-btn export-btn-excel" onclick="exportToExcel()">📥 Export to Excel</button>
+      <button class="export-btn export-btn-pdf" onclick="exportToPDF()">📄 Export to PDF</button>
+      <button class="export-btn export-btn-cancel" onclick="closeExportModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

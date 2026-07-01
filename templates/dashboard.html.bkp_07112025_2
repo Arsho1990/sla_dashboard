@@ -1,0 +1,162 @@
+<head>
+  <title>SLA Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .file-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .download-btn, .delete-btn {
+      padding: 2px 6px;
+      font-size: 12px;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .download-btn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    .delete-btn {
+      background-color: #f44336;
+      color: white;
+    }
+  </style>
+</head>
+
+<form method="POST" action="/update" enctype="multipart/form-data">
+  <table border="1">
+    <tr>
+      <th>Bank Name</th>
+      <th>Period</th>
+      <th>Last Year SLA</th>
+      <th>Current Year SLA</th>
+      <th>DIFF</th>
+      <th>%</th>
+      <th>Status</th>
+      <th>% Target</th>
+      <th>Comments</th>
+      <th>File</th>
+      <th>Actions</th>
+      <th>Future 10%</th>
+      <th>Future 11%</th>
+      <th>Future 12%</th>
+      <th>Future 13%</th>
+      <th>Future 14%</th>
+      <th>Future 15%</th>
+      <th>Future 18%</th>
+      <th>Future 20%</th>
+    </tr>
+    {% for row in data %}
+    <tr>
+      <td><input name="BANK_NAME_{{ loop.index0 }}" value="{{ row['BANK_NAME'] }}"></td>
+      <td><input name="PERIOD_{{ loop.index0 }}" value="{{ row['PERIOD'] }}"></td>
+      <td><input name="LAST_YEAR_SLA_{{ loop.index0 }}" value="{{ row['LAST_YEAR_SLA'] }}"></td>
+      <td><input name="CURRENT_YEAR_SLA_{{ loop.index0 }}" value="{{ row['CURRENT_YEAR_SLA'] }}"></td>
+      <td><input name="DIFF_{{ loop.index0 }}" value="{{ row['DIFF'] }}"></td>
+      <td><input name="PERCENTAGE_{{ loop.index0 }}" value="{{ row['PERCENTAGE'] }}"></td>
+      <td><input name="STATUS_{{ loop.index0 }}" value="{{ row['STATUS'] }}"></td>
+      <td><input name="PERCENTAGE_TARGET_{{ loop.index0 }}" value="{{ row['PERCENTAGE_TARGET'] }}"></td>
+      <td><input name="COMMENTS_{{ loop.index0 }}" value="{{ row['COMMENTS'] }}"></td>
+      <td>
+        <input type="file" name="SLA_DOC_{{ loop.index0 }}" accept=".pdf,.doc,.docx">
+      </td>
+      <td class="file-actions">
+        {% if row.SLA_DOC_FILENAME %}
+          <a class="download-btn" href="/download?bank={{ row.BANK_NAME }}&period={{ row.PERIOD }}">Download</a>
+          <form action="/delete" method="post" style="display:inline;">
+            <input type="hidden" name="bank" value="{{ row.BANK_NAME }}">
+            <input type="hidden" name="period" value="{{ row.PERIOD }}">
+            <button class="delete-btn" type="submit">Delete</button>
+          </form>
+        {% else %}
+          <span>No file</span>
+        {% endif %}
+      </td>
+      <td>{{ row['FUTURE_10'] | default(0) | round(2) }}</td>
+      <td>{{ row['FUTURE_11'] | default(0) | round(2) }}</td>
+      <td>{{ row['FUTURE_12'] | default(0) | round(2) }}</td>
+      <td>{{ row['FUTURE_13'] | default(0) | round(2) }}</td>
+      <td>{{ row['FUTURE_14'] | default(0) | round(2) }}</td>
+      <td>{{ row['FUTURE_15'] | default(0) | round(2) }}</td>
+      <td>{{ row['FUTURE_18'] | default(0) | round(2) }}</td>
+      <td>{{ row['FUTURE_20'] | default(0) | round(2) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <input type="hidden" name="total_rows" value="{{ data|length }}">
+  <button type="submit">Save</button>
+</form>
+
+<h2 style="color:purple;">SLA Difference Overview</h2>
+<canvas id="diffChart" width="600" height="300"></canvas>
+
+<h2 style="color:grey;">Target Percentage Pie</h2>
+<canvas id="targetChart" width="600" height="300"></canvas>
+
+<script>
+  const banks = {{ banks | tojson }};
+  const diff = {{ diff | tojson }};
+  const target = {{ target | tojson }};
+
+  // Bar Chart for SLA Difference
+  const diffCtx = document.getElementById('diffChart').getContext('2d');
+  new Chart(diffCtx, {
+    type: 'bar',
+    data: {
+      labels: banks,
+      datasets: [{
+        label: 'SLA Difference',
+        data: diff,
+        backgroundColor: 'rgba(128, 0, 128, 0.6)',
+        borderColor: 'rgba(128, 0, 128, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+
+  // Pie Chart for Target Percentages
+  const targetCtx = document.getElementById('targetChart').getContext('2d');
+  new Chart(targetCtx, {
+    type: 'pie',
+    data: {
+      labels: banks,
+      datasets: [{
+        label: 'Target %',
+        data: target,
+        backgroundColor: [
+          'rgba(128, 0, 128, 0.6)',
+          'rgba(169, 169, 169, 0.6)',
+          'rgba(192, 192, 192, 0.6)',
+          'rgba(112, 128, 144, 0.6)',
+          'rgba(75, 0, 130, 0.6)',
+          'rgba(105, 105, 105, 0.6)',
+          'rgba(153, 50, 204, 0.6)',
+          'rgba(119, 136, 153, 0.6)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true
+    }
+  });
+</script>

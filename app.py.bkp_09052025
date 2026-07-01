@@ -1,0 +1,858 @@
+from flask import Flask, request, render_template, send_file, redirect, session, jsonify, url_for
+import pandas as pd
+import oracledb
+import io
+from datetime import datetime, timedelta, timezone
+import functools
+
+
+app = Flask(__name__)
+app.secret_key = 'your_super_secret_key_here'
+app.permanent_session_lifetime = timedelta(minutes=15)  # Session timeout
+
+def get_connection():
+    return oracledb.connect(user="asnafees", password="Gryhhhbbn1", dsn="172.16.0.84:1521/orcl.avanza.pk")
+    
+from datetime import datetime, timedelta, timezone
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
+    now = datetime.now(timezone.utc)  # timezone-aware
+    session_modified = session.get('last_interaction')
+
+    if 'username' in session:
+        if session_modified:
+            try:
+                if not isinstance(session_modified, datetime):
+                    session_modified = datetime.fromisoformat(session_modified)
+
+                if (now - session_modified).total_seconds() > 600:
+                    username = session['username']
+                    login_time = session.get('login_time')
+                    if login_time and not isinstance(login_time, datetime):
+                        login_time = datetime.fromisoformat(login_time)
+
+                    session.clear()
+
+                    # Save session duration
+                    if login_time:
+                        duration = now - login_time
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            UPDATE USERS
+                            SET LAST_SESSION_DURATION = :duration
+                            WHERE USERNAME = :username
+                        """, {
+                            'duration': str(duration),
+                            'username': username
+                        })
+                        conn.commit()
+                        cursor.close()
+                        conn.close()
+
+                    return redirect(url_for('login'))
+            except Exception as e:
+                print("Session error:", str(e))
+
+        # Store updated timestamp
+        session['last_interaction'] = now.isoformat()
+
+        
+        # ✅ Set login time on successful login
+#def handle_successful_login(username):
+#    session['username'] = username
+#    session['login_time'] = datetime.now(timezone.utc).isoformat()
+#    session['last_interaction'] = datetime.now(timezone.utc)
+#    # Also store role if needed
+def handle_successful_login(username):
+    now = datetime.now(timezone.utc)
+    session['username'] = username
+    session['login_time'] = now.isoformat()
+
+    # Update LOGIN_TIME in DB
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE USERS SET LOGIN_TIME = :login_time WHERE USERNAME = :username
+    """, {
+        'login_time': now,
+        'username': username
+    })
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+@app.route('/')
+def dashboard():
+    if 'username' not in session:
+        return redirect('/login')
+
+    selected_bank = request.args.get('bank')
+    
+    # ✅ Fetch login/logout timestamp for current user
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT LOGIN_TIME, LOGOUT_TIME 
+        FROM USERS 
+        WHERE USERNAME = :username
+    """, {'username': session['username']})
+    login_logout = cursor.fetchone()
+    login_time = login_logout[0] if login_logout else None
+    logout_time = login_logout[1] if login_logout else None
+
+    conn = get_connection()
+    df = pd.read_sql("SELECT * FROM SLA", conn)
+    conn.close()
+    
+    for col in ['YEAR_2023', 'YEAR_2024', 'YEAR_2025']:
+        df[col] = (
+            df[col].astype(str)
+                  .str.replace(',', '', regex=False)
+                  .str.strip()
+                  .replace({'None': '0', 'null': '0', '': '0'})
+                  .astype(float)
+        )
+
+    df['SLA_CURRENCY'] = df['SLA_CURRENCY'].astype(str).str.upper().str.strip().fillna('UNKNOWN')
+    all_banks = df['BANK_NAME'].unique().tolist()
+
+    if selected_bank:
+        df = df[df['BANK_NAME'] == selected_bank]
+        
+    year_cols = ['YEAR_2023', 'YEAR_2024', 'YEAR_2025']
+    def compute_diff_and_pct(row):
+        non_zero_years = [(col, row[col]) for col in year_cols if row[col] > 0]
+        if len(non_zero_years) >= 2:
+            prev_year, prev_val = non_zero_years[-2]
+            curr_year, curr_val = non_zero_years[-1]
+            diff = curr_val - prev_val
+            pct = (curr_val / prev_val * 100) if prev_val != 0 else 0
+        else:
+            diff = 0
+            pct = 0
+        return pd.Series([diff, pct], index=['DIFF', 'PCT_INC'])
+
+    df[['DIFF', 'PCT_INC']] = df.apply(compute_diff_and_pct, axis=1)
+
+    def safe_float(val):
+        try:
+            return float(val)
+        except:
+            return 0.0
+
+    banks = df['BANK_NAME'].tolist()
+    y2023 = [safe_float(v) for v in df['YEAR_2023']]
+    y2024 = [safe_float(v) for v in df['YEAR_2024']]
+    y2025 = [safe_float(v) for v in df['YEAR_2025']]
+        # Graph % increases
+    percent_23_to_24 = [(b - a) / a * 100 if a else 0 for a, b in zip(y2023, y2024)]
+    percent_24_to_25 = [(b - a) / a * 100 if a else 0 for a, b in zip(y2024, y2025)]
+
+    # Compute year-wise totals by SLA_CURRENCY
+    grouped = df.groupby('SLA_CURRENCY')[['YEAR_2023', 'YEAR_2024', 'YEAR_2025']].sum().reset_index()
+
+    currency_totals = grouped.to_dict(orient='records')
+
+    return render_template("dashboard.html",
+                           data=df.to_dict(orient='records'),
+                           banks=banks,
+                           y2023=y2023,
+                           y2024=y2024,
+                           y2025=y2025,
+                           percent_23_to_24=percent_23_to_24,
+                           percent_24_to_25=percent_24_to_25,
+                           all_banks=all_banks,
+                           selected_bank=selected_bank,
+                           role=session.get('role'),
+                           currency_totals=currency_totals,
+                           login_time=login_time,
+                           logout_time=logout_time)
+                           
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT PASSWORD, ROLE FROM USERS WHERE USERNAME = :username", {'username': username})
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if result and result[0] == password:
+            session['username'] = username
+            session['role'] = result[1]  # store role (admin/viewer)
+            handle_successful_login(username)
+            return redirect(url_for('dashboard'))
+        else:
+            return render_template('login.html', error='Invalid credentials')
+
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect('/login')
+
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password'].strip()
+        confirm_password = request.form['confirm_password'].strip()
+        role = request.form['role'].strip().lower()
+
+        if not username or not password or not confirm_password or role not in ['admin', 'viewer']:
+            return render_template('register.html', error='All fields are required with valid role.')
+
+        if password != confirm_password:
+            return render_template('register.html', error='Passwords do not match.')
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM USERS WHERE USERNAME = :username", {'username': username})
+        if cursor.fetchone()[0] > 0:
+            cursor.close()
+            conn.close()
+            return render_template('register.html', error='Username already exists.')
+
+        cursor.execute("""
+            INSERT INTO USERS (USERNAME, PASSWORD, ROLE, USER_CREATION_DATE)
+            VALUES (:username, :password, :role, :creation_date)
+        """, {
+            'username': username,
+            'password': password,
+            'role': role,
+            'creation_date': datetime.now()
+        })
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return render_template('register.html', success='User registered successfully.')
+
+    return render_template('register.html')
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+
+        if not username or not old_password or not new_password or not confirm_password:
+            return render_template('forgot_password.html', error='All fields are required.')
+
+        if new_password != confirm_password:
+            return render_template('forgot_password.html', error='New passwords do not match.')
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT PASSWORD FROM USERS WHERE USERNAME = :username", {'username': username})
+        result = cursor.fetchone()
+
+        if result and result[0] == old_password:
+            now = datetime.now()
+            cursor.execute("""
+                UPDATE USERS SET 
+                    PASSWORD = :new_password, 
+                    LAST_PASSWORD_CHANGE = TO_TIMESTAMP(:now, 'YYYY-MM-DD HH24:MI:SS')
+                WHERE USERNAME = :username
+            """, {
+                'new_password': new_password,
+                'now': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'username': username
+            })
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return render_template('forgot_password.html', success='Password successfully changed.')
+        else:
+            cursor.close()
+            conn.close()
+            return render_template('forgot_password.html', error='Old password is incorrect.')
+
+    return render_template('forgot_password.html')
+    
+@app.route('/logout')
+def logout():
+    username = session.get('username')
+    login_time_str = session.get('login_time')
+
+    if username and login_time_str:
+        try:
+            login_time = datetime.fromisoformat(login_time_str.replace("Z", "+00:00"))
+            logout_time = datetime.now(timezone.utc)
+            duration = logout_time - login_time
+
+            # Format duration to HH:MM:SS
+            total_seconds = int(duration.total_seconds())
+            formatted_duration = f"{total_seconds // 3600:02}:{(total_seconds % 3600) // 60:02}:{total_seconds % 60:02}"
+
+            # Save all session info
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE USERS
+                SET 
+                    LOGOUT_TIME = :logout_time,
+                    LAST_SESSION_DURATION = :duration
+                WHERE USERNAME = :username
+            """, {
+                'logout_time': logout_time,
+                'duration': formatted_duration,
+                'username': username
+            })
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Error saving session data: {e}")
+
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    bank = request.form['bank']
+    period = request.form['period']
+    file = request.files['file']
+    now = datetime.now()
+
+    if file:
+        content = file.read()
+        filename = file.filename
+        mimetype = file.mimetype
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE SLA SET 
+                SLA_DOC = :blob, 
+                SLA_DOC_FILENAME = :filename,
+                SLA_DOC_TYPE = :type,
+                UPLOAD_DATE = :upload_date,
+                MODIFIED_DATE = :modified_date
+            WHERE BANK_NAME = :bank AND PERIOD = :period
+        """, {
+            'blob': content,
+            'filename': filename,
+            'type': mimetype,
+            'upload_date': now,
+            'modified_date': now,
+            'bank': bank,
+            'period': period
+        })
+        conn.commit()
+        cursor.close()
+        conn.close()
+    return redirect("/")
+
+@app.route("/download")
+def download_file():
+    bank = request.args.get('bank')
+    period = request.args.get('period')
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT SLA_DOC, SLA_DOC_FILENAME, SLA_DOC_TYPE
+            FROM SLA
+            WHERE BANK_NAME = :bank AND PERIOD = :period
+        """, {'bank': bank, 'period': period})
+
+        row = cursor.fetchone()
+        if row and row[0] is not None:
+            # ✅ Read LOB data immediately
+            blob_data = row[0].read()
+            filename = row[1]
+            filetype = row[2]
+            return send_file(io.BytesIO(blob_data), download_name=filename, mimetype=filetype)
+
+        return "File not found", 404
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.route("/delete", methods=["POST"])
+def delete_file():
+    bank = request.form['bank']
+    period = request.form['period']
+    now = datetime.now()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE SLA SET 
+            SLA_DOC = NULL, 
+            SLA_DOC_FILENAME = NULL, 
+            SLA_DOC_TYPE = NULL,
+            MODIFIED_DATE = :modified_date
+        WHERE BANK_NAME = :bank AND PERIOD = :period
+    """, {'bank': bank, 'period': period, 'modified_date': now})
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect("/")
+    
+@app.route("/update_field", methods=["POST"])
+def update_field():
+    if session.get("role") != "admin":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data = request.get_json()
+    bank = data.get("bank")
+    period = data.get("period")
+    field = data.get("field")
+    value = data.get("value")
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Update field + modified date
+        sql = f"""
+            UPDATE SLA 
+            SET {field} = :value, MODIFIED_DATE = SYSTIMESTAMP
+            WHERE BANK_NAME = :bank AND PERIOD = :period
+        """
+        cursor.execute(sql, {"value": value, "bank": bank, "period": period})
+
+        # Get fresh timestamp
+        cursor.execute("""
+            SELECT TO_CHAR(MODIFIED_DATE, 'DD-Mon-YYYY HH:MI:SS AM')
+            FROM SLA
+            WHERE BANK_NAME = :bank AND PERIOD = :period
+        """, {"bank": bank, "period": period})
+        new_timestamp = cursor.fetchone()[0]
+
+        conn.commit()
+        return jsonify(success=True, last_updated=new_timestamp)
+
+    except Exception as e:
+        return jsonify(success=False, message=str(e))
+
+    finally:
+        cursor.close()
+        conn.close()
+
+#@app.route("/licenses", methods=["GET", "POST"])
+#def licenses():
+#    if "username" not in session:
+#        return redirect("/login")
+#
+#    if session.get("role") != "admin":
+#        return "Unauthorized access", 403
+#
+#    conn = get_connection()
+#    cursor = conn.cursor()
+#
+#    # --- Handle RDV License Form ---
+#    if request.method == "POST" and request.form.get("form_type") == "rdv":
+#        cursor.execute("""
+#            MERGE INTO RDV_LICENSES r
+#            USING (SELECT :client AS client FROM dual) d
+#            ON (r.CLIENT_NAME = d.client)
+#            WHEN MATCHED THEN
+#                UPDATE SET LICENSE_GUID = :license_guid,
+#                           MaxNetworks = :max_networks,
+#                           MaxAdapters = :max_adapters,
+#                           MT = :mt,
+#                           TP = :tp,
+#                           TCPIP = :tcpip,
+#                           Sybase = :sybase,
+#                           WebService = :webservice,
+#                           MSMQ = :msmq,
+#                           MQSeries = :mqseries,
+#                           STATUS = :status,
+#                           LAST_UPDATED = CURRENT_TIMESTAMP
+#            WHEN NOT MATCHED THEN
+#                INSERT (CLIENT_NAME, LICENSE_GUID, MaxNetworks, MaxAdapters, MT, TP, TCPIP, Sybase, WebService, MSMQ, MQSeries, STATUS, LAST_UPDATED)
+#                VALUES (:client, :license_guid, :max_networks, :max_adapters, :mt, :tp, :tcpip, :sybase, :webservice, :msmq, :mqseries, :status, CURRENT_TIMESTAMP)
+#        """, request.form)
+#        conn.commit()
+#
+#    # --- Handle Nimbus License Form ---
+#    if request.method == "POST" and request.form.get("form_type") == "nimbus":
+#        cursor.execute("""
+#            MERGE INTO NIMBUS_LICENSES n
+#            USING (SELECT :client AS client FROM dual) d
+#            ON (n.CLIENT_NAME = d.client)
+#            WHEN MATCHED THEN
+#                UPDATE SET LICENSE_GUID = :license_guid,
+#                           MaxTerminals = :max_terminals,
+#                           LAST_UPDATED = CURRENT_TIMESTAMP
+#            WHEN NOT MATCHED THEN
+#                INSERT (CLIENT_NAME, LICENSE_GUID, MaxTerminals, LAST_UPDATED)
+#                VALUES (:client, :license_guid, :max_terminals, CURRENT_TIMESTAMP)
+#        """, request.form)
+#        conn.commit()
+#
+#    # --- Fetch RDV Data ---
+#    cursor.execute("SELECT CLIENT_NAME, LICENSE_GUID, MaxNetworks, MaxAdapters, MT, TP, TCPIP, Sybase, WebService, MSMQ, MQSeries, STATUS, LAST_UPDATED FROM RDV_LICENSES")
+#    rdv = [dict(zip([c[0] for c in cursor.description], row)) for row in cursor.fetchall()]
+#
+#    # --- Fetch Nimbus Data ---
+#    cursor.execute("SELECT CLIENT_NAME, LICENSE_GUID, MaxTerminals, LAST_UPDATED FROM NIMBUS_LICENSES")
+#    nimbus = [dict(zip([c[0] for c in cursor.description], row)) for row in cursor.fetchall()]
+#
+#    cursor.close()
+#    conn.close()
+#
+#    return render_template("licenses.html", rdv=rdv, nimbus=nimbus, clients=clients, selected_client=client_filter, role=session.get("role"))
+
+@app.route("/licenses")
+def licenses():
+    client_filter = request.args.get("client")
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # Queries
+    rdv_query = "SELECT * FROM RDV_LICENSES"
+    nimbus_query = "SELECT * FROM NIMBUS_LICENSES"
+    log_query = "SELECT * FROM LICENSE_EDIT_LOG"
+
+    params = {}
+    if client_filter:
+        rdv_query += " WHERE CLIENT_NAME = :client"
+        nimbus_query += " WHERE CLIENT_NAME = :client"
+        log_query += " WHERE CLIENT_NAME = :client"
+        params = {"client": client_filter}
+
+    # Fetch RDV + Nimbus rows
+    cur.execute(rdv_query, params)
+    rdv = [dict(zip([col[0] for col in cur.description], row)) for row in cur.fetchall()]
+
+    cur.execute(nimbus_query, params)
+    nimbus = [dict(zip([col[0] for col in cur.description], row)) for row in cur.fetchall()]
+    
+    # Fetch Edit Logs (new)
+    cur.execute(log_query + " ORDER BY CHANGE_TIME DESC", params)
+    logs = [dict(zip([c[0] for c in cur.description], row)) for row in cur.fetchall()]
+
+    # Always refresh clients list (for dropdown)
+    cur.execute("""
+        SELECT DISTINCT CLIENT_NAME FROM (
+            SELECT CLIENT_NAME FROM RDV_LICENSES
+            UNION
+            SELECT CLIENT_NAME FROM NIMBUS_LICENSES
+        ) ORDER BY CLIENT_NAME
+    """)
+    clients = [row[0] for row in cur.fetchall()]
+
+    cur.close()
+    conn.close()
+
+    # 🚀 Pass the filter to the template so both forms are prefilled
+    return render_template(
+        "licenses.html",
+        rdv=rdv,
+        nimbus=nimbus,
+        logs=logs,
+        clients=clients,
+        selected_client=client_filter,
+        role=session.get("role")
+    )
+
+@app.route("/update_license_field", methods=["POST"])
+def update_license_field():
+    if session.get("role") != "admin":
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+    data = request.json
+    table = data["table"]
+    client = data["client"]
+    field = data["field"]
+    new_value = data["value"]
+    user = session.get("username")
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        # fetch old value
+        cur.execute(f"SELECT {field} FROM {table} WHERE CLIENT_NAME = :client", {"client": client})
+        old_value = cur.fetchone()
+        old_value = old_value[0] if old_value else None
+
+        # update field
+        cur.execute(f"""
+            UPDATE {table}
+            SET {field} = :val, LAST_UPDATED = SYSTIMESTAMP
+            WHERE CLIENT_NAME = :client
+        """, {"val": new_value, "client": client})
+
+        # insert log
+        cur.execute("""
+            INSERT INTO LICENSE_EDIT_LOG (TABLE_NAME, CLIENT_NAME, FIELD_NAME, OLD_VALUE, NEW_VALUE, CHANGED_BY, CHANGE_TIME)
+            VALUES (:table, :client, :field, :old, :new, :user, SYSTIMESTAMP)
+        """, {
+            "table": table, "client": client, "field": field,
+            "old": old_value, "new": new_value, "user": user
+        })
+
+        # fetch new last_updated
+        cur.execute(f"SELECT TO_CHAR(LAST_UPDATED, 'DD-Mon-YYYY HH:MI:SS AM') FROM {table} WHERE CLIENT_NAME = :client", {"client": client})
+        last_updated = cur.fetchone()[0]
+
+        conn.commit()
+        return jsonify(success=True, last_updated=last_updated)
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify(success=False, message=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+from flask import jsonify, request
+
+# -------------------------
+# ADD RDV License (already shared earlier)
+# -------------------------
+
+#@app.route("/add_nimbus_license", methods=["POST"])
+#def add_nimbus_license():
+#    data = request.get_json()
+#    try:
+#        conn = get_connection()
+#        cur = conn.cursor()
+#
+#        last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#
+#        cur.execute("""
+#            INSERT INTO NIMBUS_LICENSES
+#            (CLIENT_NAME, LICENSE_GUID, MAXTERMINALS, LAST_UPDATED)
+#            VALUES (:1,:2,:3,:4)
+#            RETURNING ID INTO :5
+#        """, [
+#            data.get("CLIENT_NAME"),
+#            data.get("LICENSE_GUID"),
+#            data.get("MAXTERMINALS"),
+#            last_updated,
+#            cur.var(int)
+#        ])
+#
+#        new_id = cur.getvalue(4)
+#        conn.commit()
+#        return jsonify({
+#            "id": new_id,
+#            "CLIENT_NAME": data.get("CLIENT_NAME"),
+#            "LICENSE_GUID": data.get("LICENSE_GUID"),
+#            "MAXTERMINALS": data.get("MAXTERMINALS"),
+#            "LAST_UPDATED": last_updated
+#        })
+#    except Exception as e:
+#        return jsonify({"error": str(e)})
+#    finally:
+#        cur.close()
+#        conn.close()
+
+
+# -------------------------
+# INLINE UPDATE ENDPOINT (RDV + NIMBUS)
+# -------------------------
+
+from datetime import datetime
+
+@app.route("/update_license", methods=["POST"])
+def update_license():
+    from datetime import datetime
+    data = request.get_json()
+    app.logger.info(f"Received batched update request: {data}")
+
+    id_ = data.get("id")
+    table = data.get("table")
+    updates = data.get("updates", [])
+
+    allowed_tables = {"RDV_LICENSES", "NIMBUS_LICENSES"}
+    if table not in allowed_tables:
+        return jsonify({"error": "Invalid table"}), 400
+
+    allowed_fields = {
+        "RDV_LICENSES": {"CLIENT_NAME","LICENSE_GUID","MAXNETWORKS","MAXADAPTERS","MTS_MPS","TP",
+                         "TCPIP","SYBASE","WEBSERVICE","MSMQ","MQSERIES","STATUS"},
+        "NIMBUS_LICENSES": {"CLIENT_NAME","LICENSE_GUID","MAXTERMINALS","STATUS"}
+    }
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        for upd in updates:
+            field, value = upd["field"], upd["value"]
+
+            if field not in allowed_fields[table]:
+                return jsonify({"error": f"Invalid field {field}"}), 400
+
+            # 🔹 Fetch old value for audit log
+            cur.execute(f"SELECT {field}, CLIENT_NAME FROM {table} WHERE ID = :id", {"id": id_})
+            row = cur.fetchone()
+            old_value, client_name = row if row else (None, None)
+
+            # 🔹 Use positional binds (:1, :2) instead of named
+            sql = f"UPDATE {table} SET {field} = :1, LAST_UPDATED = SYSTIMESTAMP WHERE ID = :2"
+            app.logger.info(f"Executing SQL: {sql} with params=({value}, {id_})")
+            cur.execute(sql, [value, id_])
+
+            # 🔹 Insert into LICENSE_EDIT_LOG
+            cur.execute("""
+                INSERT INTO LICENSE_EDIT_LOG
+                (TABLE_NAME, CLIENT_NAME, FIELD_NAME, OLD_VALUE, NEW_VALUE, CHANGED_BY, CHANGE_TIME)
+                VALUES (:1, :2, :3, :4, :5, :6, SYSTIMESTAMP)
+            """, [table, client_name, field, old_value, value, session.get("username", "system")])
+
+        conn.commit()
+        return jsonify({
+            "status": "ok",
+            "LAST_UPDATED": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error updating license: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+
+
+@app.route("/license_history_api/<table>/<client>")
+def license_history_api(table, client):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT FIELD_NAME, OLD_VALUE, NEW_VALUE, CHANGED_BY,
+               TO_CHAR(CHANGE_TIME, 'DD-Mon-YYYY HH:MI:SS AM') AS CHANGE_TIME
+        FROM LICENSE_EDIT_LOG
+        WHERE TABLE_NAME = :table AND CLIENT_NAME = :client
+        ORDER BY CHANGE_TIME DESC
+    """, {"table": table, "client": client})
+    logs = [dict(zip([d[0] for d in cur.description], row)) for row in cur.fetchall()]
+
+    cur.close()
+    conn.close()
+    return jsonify(logs)
+ 
+# --- Add RDV License ---
+from flask import jsonify
+from datetime import datetime
+
+@app.route("/add_rdv_license", methods=["POST"])
+def add_rdv_license():
+    
+    if session.get("role") != "admin":
+        return jsonify({"error": "Unauthorized: Admins only"}), 403
+    
+    data = request.get_json()
+    print("Received RDV insert:", data)  # debug
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            INSERT INTO RDV_LICENSES
+            (CLIENT_NAME, LICENSE_GUID, MAXNETWORKS, MAXADAPTERS, MTS_MPS, TP, TCPIP, SYBASE, WEBSERVICE, MSMQ, MQSERIES, STATUS, LAST_UPDATED)
+            VALUES (:CLIENT_NAME, :LICENSE_GUID, :MAXNETWORKS, :MAXADAPTERS, :MTS_MPS, :TP, :TCPIP, :SYBASE, :WEBSERVICE, :MSMQ, :MQSERIES, :STATUS, SYSTIMESTAMP)
+        """, {
+            "CLIENT_NAME": data.get("CLIENT_NAME"),
+            "LICENSE_GUID": data.get("LICENSE_GUID"),
+            "MAXNETWORKS": data.get("MAXNETWORKS"),
+            "MAXADAPTERS": data.get("MAXADAPTERS"),
+            "MTS_MPS": data.get("MTS_MPS"),
+            "TP": data.get("TP"),
+            "TCPIP": data.get("TCPIP"),
+            "SYBASE": data.get("SYBASE"),
+            "WEBSERVICE": data.get("WEBSERVICE"),
+            "MSMQ": data.get("MSMQ"),
+            "MQSERIES": data.get("MQSERIES"),
+            "STATUS": data.get("STATUS"),
+        })
+
+        conn.commit()
+
+        cur.execute("""
+            SELECT ID, CLIENT_NAME, LICENSE_GUID, MAXNETWORKS, MAXADAPTERS, MTS_MPS, TP, TCPIP,
+                   SYBASE, WEBSERVICE, MSMQ, MQSERIES, STATUS,
+                   TO_CHAR(LAST_UPDATED, 'YYYY-MM-DD HH24:MI:SS') AS LAST_UPDATED
+            FROM RDV_LICENSES
+            WHERE ROWID = (SELECT MAX(ROWID) FROM RDV_LICENSES)
+        """)
+        row = cur.fetchone()
+        cols = [d[0] for d in cur.description]
+        result = dict(zip(cols, row))
+
+    except Exception as e:
+        conn.rollback()
+        print("Error inserting RDV:", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+    return jsonify(result)
+
+
+@app.route("/add_nimbus_license", methods=["POST"])
+def add_nimbus_license():
+    
+    if session.get("role") != "admin":
+        return jsonify({"error": "Unauthorized: Admins only"}), 403
+    
+    data = request.get_json()
+    print("Received Nimbus insert:", data)  # debug log
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            INSERT INTO NIMBUS_LICENSES
+            (CLIENT_NAME, LICENSE_GUID, MAXTERMINALS, LAST_UPDATED)
+            VALUES (:CLIENT_NAME, :LICENSE_GUID, :MAXTERMINALS, SYSTIMESTAMP)
+        """, {
+            "CLIENT_NAME": data.get("CLIENT_NAME"),
+            "LICENSE_GUID": data.get("LICENSE_GUID"),
+            "MAXTERMINALS": data.get("MAXTERMINALS"),
+        })
+
+        conn.commit()
+
+        # return the inserted row
+        cur.execute("""
+            SELECT ID, CLIENT_NAME, LICENSE_GUID, MAXTERMINALS,
+                   TO_CHAR(LAST_UPDATED, 'YYYY-MM-DD HH24:MI:SS') AS LAST_UPDATED
+            FROM NIMBUS_LICENSES
+            WHERE ROWID = (SELECT MAX(ROWID) FROM NIMBUS_LICENSES)
+        """)
+        row = cur.fetchone()
+        cols = [d[0] for d in cur.description]
+        result = dict(zip(cols, row))
+
+    except Exception as e:
+        conn.rollback()
+        print("Error inserting Nimbus:", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+    return jsonify(result)
+
+
+if __name__ == "__main__":
+    #app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
