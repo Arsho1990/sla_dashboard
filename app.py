@@ -2,8 +2,13 @@ from flask import Flask, request, render_template, send_file, redirect, session,
 import pandas as pd
 import oracledb
 import io
+import re
 from datetime import datetime, timedelta, timezone
 import functools
+import os
+from pathlib import Path
+from PIL import Image
+from werkzeug.utils import secure_filename
 
 # Pakistan Standard Time (UTC+5)
 PKT = timezone(timedelta(hours=5))
@@ -15,6 +20,11 @@ app.permanent_session_lifetime = timedelta(minutes=15)  # Session timeout
 
 def get_connection():
     return oracledb.connect(user="asnafees", password="Gryhhhbbn1", dsn="172.16.0.84:1521/orcl.avanza.pk")
+
+def build_bank_logo_filename(bank_name):
+    safe_name = re.sub(r'[^A-Za-z0-9_.-]', '_', (bank_name or '').strip()).strip().lower()
+    return f"{safe_name or 'bank'}.png"
+
 
 def auto_create_year_column(year, conn=None):
     """Auto-create YEAR_* column if it doesn't exist, based on latest YEAR_* column structure"""
@@ -1268,6 +1278,93 @@ def add_sla():
     return redirect(url_for('sla_page'))
 
 
+@app.route("/add_bank", methods=["POST"])
+def add_bank():
+    if session.get("role") != "admin":
+        return jsonify({"error": "Not authorized"}), 403
+
+    bank_name = (request.form.get("BANK_NAME") or "").strip()
+    currency = (request.form.get("CURRENCY_MODE") or "").strip().upper()
+    logo_file = request.files.get("BANK_LOGO")
+
+    if not bank_name or not currency:
+        return jsonify({"error": "Bank Name and Currency are required"}), 400
+
+    if currency not in {"PKR", "USD"}:
+        return jsonify({"error": "Currency must be PKR or USD"}), 400
+
+    if not logo_file or not logo_file.filename:
+        return jsonify({"error": "A bank logo is required"}), 400
+
+    logo_filename = build_bank_logo_filename(bank_name)
+    logo_dir = Path(app.static_folder) / "logos"
+    logo_dir.mkdir(parents=True, exist_ok=True)
+    logo_path = logo_dir / logo_filename
+
+    try:
+        uploaded_name = secure_filename(logo_file.filename)
+        if not uploaded_name.lower().endswith((".png", ".jpg", ".jpeg")):
+            return jsonify({"error": "Only PNG/JPG uploads are allowed"}), 400
+
+        image = Image.open(io.BytesIO(logo_file.read()))
+        image = image.convert("RGBA") if image.mode in ("RGBA", "LA") else image.convert("RGB")
+        image.save(logo_path, format="PNG")
+    except Exception as e:
+        app.logger.error("Error processing bank logo: %s", e)
+        return jsonify({"error": f"Unable to save logo: {e}"}), 400
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            "SELECT COUNT(*) FROM BANK_SLA WHERE UPPER(BANK_NAME) = :bank",
+            {"bank": bank_name.upper()}
+        )
+        if cur.fetchone()[0] > 0:
+            return jsonify({"error": "Bank already exists"}), 409
+
+        cur.execute(
+            """
+            INSERT INTO BANK_SLA
+            (BANK_NAME, CURRENCY_MODE, SLA_YEAR,
+             CURRENT_YEAR_COST, LAST_YEAR_COST, ADDITIONAL_ITEMS_COST, SUBTRACTION_ITEMS_COST,
+             SLA_INCREMENT, SLA_INCREMENT_WITH_ADDITION,
+             INCREMENT_PER, INCREMENT_PER_WITH_ADDITION, STATUS,
+             CREATED_AT, UPDATED_AT)
+            VALUES (:BANK_NAME, :CURRENCY_MODE, :SLA_YEAR,
+             :CURRENT_YEAR_COST, :LAST_YEAR_COST, :ADDITIONAL_ITEMS_COST, :SUBTRACTION_ITEMS_COST,
+             :SLA_INCREMENT, :SLA_INCREMENT_WITH_ADDITION,
+             :INCREMENT_PER, :INCREMENT_PER_WITH_ADDITION, :STATUS,
+             SYSTIMESTAMP, SYSTIMESTAMP)
+            """,
+            {
+                "BANK_NAME": bank_name,
+                "CURRENCY_MODE": currency,
+                "SLA_YEAR": 2027,
+                "CURRENT_YEAR_COST": 0,
+                "LAST_YEAR_COST": 0,
+                "ADDITIONAL_ITEMS_COST": 0,
+                "SUBTRACTION_ITEMS_COST": 0,
+                "SLA_INCREMENT": 0,
+                "SLA_INCREMENT_WITH_ADDITION": 0,
+                "INCREMENT_PER": None,
+                "INCREMENT_PER_WITH_ADDITION": None,
+                "STATUS": "Active"
+            }
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        app.logger.error("Error inserting bank: %s", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+    return redirect(url_for('sla_page'))
+
+
 # ---------- SLA page (list + filters) ----------
 @app.route("/sla")
 def sla_page():
@@ -1355,10 +1452,7 @@ def sla_page():
                 r['INCREMENT_PER_WITH_ADDITION'] = None
 
         # build a normalized logo filename so template can load reliably
-        name = r.get('BANK_NAME') or ''
-        # keep only safe chars and replace separators with underscores
-        logo_filename = re.sub(r'[^A-Za-z0-9_.-]', '_', name).lower() + '.png'
-        r['LOGO_FILENAME'] = logo_filename
+        r['LOGO_FILENAME'] = build_bank_logo_filename(r.get('BANK_NAME'))
 
     # populate filter lists from BANK_SLA
     cur.execute("SELECT DISTINCT BANK_NAME FROM BANK_SLA WHERE BANK_NAME IS NOT NULL ORDER BY BANK_NAME")
@@ -1417,6 +1511,8 @@ def sla_page():
     # years for filter (static list)
     years = [2023, 2024, 2025, 2026, 2027]
 
+    selected_bank_logo_filename = build_bank_logo_filename(bank_filter) if bank_filter else ''
+
     return render_template(
         "sla.html",
         sla=rows,
@@ -1427,6 +1523,7 @@ def sla_page():
         selected_bank=bank_filter,
         selected_currency=currency_filter,
         selected_year=year_filter,
+        selected_bank_logo_filename=selected_bank_logo_filename,
         currency_totals=currency_totals,
         year_status_counts=year_status_counts
     )

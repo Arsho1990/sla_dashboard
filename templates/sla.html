@@ -66,13 +66,54 @@
 
   <!-- bank logo shown when a single bank is selected -->
   <div class="text-center mb-3">
-    {% if selected_bank %}
-      <img src="{{ url_for('static', filename='logos/' + (selected_bank|replace(' ','_')|replace('(','')|replace(')','')) + '.png') }}" height="60" alt="{{ selected_bank }}">
+    {% if selected_bank and selected_bank_logo_filename %}
+      <img src="{{ url_for('static', filename='logos/' + selected_bank_logo_filename) }}" height="60" alt="{{ selected_bank }}">
     {% endif %}
   </div>
 
-  <!-- Add SLA form (admin only) -->
+  <!-- Add Bank modal trigger (admin only) -->
   {% if role == "admin" %}
+  <div class="d-flex justify-content-end mb-3">
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBankModal" style="background-color:#4B0082;border:none;">
+      ➕ Add Bank
+    </button>
+  </div>
+
+  <div class="modal fade" id="addBankModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border:2px solid #4B0082;">
+        <div class="modal-header" style="background-color:#4B0082;color:white;">
+          <h5 class="modal-title">Add Bank</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="addBankForm" method="post" action="{{ url_for('add_bank') }}" enctype="multipart/form-data" class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Bank Name</label>
+              <input type="text" class="form-control" name="BANK_NAME" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Currency</label>
+              <select class="form-select" name="CURRENCY_MODE" required>
+                <option value="PKR">PKR</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Bank Logo (PNG/JPG)</label>
+              <input type="file" class="form-control" name="BANK_LOGO" accept=".png,.jpg,.jpeg,image/png,image/jpeg" required>
+            </div>
+            <div class="col-12 d-flex justify-content-end gap-2">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary" style="background-color:#4B0082;border:none;">Save Bank</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add SLA form (admin only) -->
   <h5 class="mt-4" style="color:#4B0082;">➕ Add SLA Record</h5>
   <form id="addSlaForm" class="row g-3" method="post" action="{{ url_for('add_sla') }}">
     <div class="col-md-3">
